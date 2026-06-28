@@ -96,7 +96,7 @@ function newProduct() {
 }
 
 function newItinerary() {
-  return {id:uid(),title:"New Itinerary",clientName:"",clientEmail:"",guestCount:2,startDate:"",origin:"Melbourne",status:"draft",notes:"",days:[{id:uid(),title:"Day 1",date:"",items:[],dayNotes:""}],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  return {id:uid(),title:"New Itinerary",clientName:"",clientEmail:"",guestCount:2,startDate:"",origin:"Melbourne",status:"draft",intro:"",notes:"",days:[{id:uid(),title:"Day 1",date:"",items:[],dayNotes:""}],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -552,6 +552,14 @@ function Preview({itinerary,productImages,showInternal,allProducts}) {
         <div style={{marginTop:16,paddingTop:12,borderTop:`1px solid rgba(255,255,255,0.12)`,fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.4)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
       </div>
 
+      {/* Intro paragraph */}
+      {itinerary.intro&&(
+        <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"20px 24px",marginBottom:20,borderLeft:`4px solid ${C.teal}`}}>
+          <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>About this journey</div>
+          <div style={{fontFamily:F.serif,fontSize:14,color:C.navy,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{itinerary.intro}</div>
+        </div>
+      )}
+
       {itinerary.days.map((day,di)=>{
         const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
         return (
@@ -920,6 +928,11 @@ export default function App() {
                   />
                 ))}
                 <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
+                <div style={{marginTop:14}}>
+                  <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>Introduction / journey overview</div>
+                  <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for this itinerary — what makes this journey special, what your guests can expect, the tone you want to set. This appears between the cover and the first day."
+                    style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:90,outline:"none"}}/>
+                </div>
                 <div style={{marginTop:14}}>
                   <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:5}}>Notes (appear in itinerary footer)</div>
                   <textarea value={active.notes} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Add any notes or terms to appear in the itinerary footer..."
