@@ -1853,8 +1853,12 @@ export default function App() {
         ::-webkit-scrollbar-thumb { background: ${B.sand}; border-radius: 3px; }
         input:focus, textarea:focus, select:focus { border-color: ${B.teal} !important; }
         @media print {
+          body { background: white !important; padding: 0 !important; }
           body > div > div:first-child { display: none !important; }
-          #print-doc { box-shadow: none !important; border-radius: 0 !important; }
+          body > div > div:last-child > div:first-child { display: none !important; }
+          body > div > div:last-child > div:nth-child(2) { display: none !important; }
+          #print-doc { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; margin: 0 !important; }
+          #print-doc * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" />
