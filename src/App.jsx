@@ -193,6 +193,70 @@ async function uploadToCloudinary(file){
   return data.secure_url.replace("/upload/","/upload/f_auto,q_auto,w_1400/");
 }
 
+// ─── Gmail OAuth ──────────────────────────────────────────────────────────────
+const GMAIL_CLIENT_ID = "427243151278-h7m87oo8fqogkoljga3el1empqkn0c06.apps.googleusercontent.com";
+const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.compose";
+const GMAIL_TOKEN_KEY = "ce_gmail_token";
+
+function getStoredToken() {
+  try {
+    const raw = localStorage.getItem(GMAIL_TOKEN_KEY);
+    if (!raw) return null;
+    const t = JSON.parse(raw);
+    if (Date.now() > t.expires_at) { localStorage.removeItem(GMAIL_TOKEN_KEY); return null; }
+    return t.access_token;
+  } catch(e) { return null; }
+}
+
+function storeToken(access_token, expires_in) {
+  localStorage.setItem(GMAIL_TOKEN_KEY, JSON.stringify({
+    access_token,
+    expires_at: Date.now() + (expires_in - 60) * 1000,
+  }));
+}
+
+function clearToken() { localStorage.removeItem(GMAIL_TOKEN_KEY); }
+
+function requestGmailToken() {
+  return new Promise((resolve, reject) => {
+    const params = new URLSearchParams({
+      client_id: GMAIL_CLIENT_ID,
+      redirect_uri: window.location.origin,
+      response_type: "token",
+      scope: GMAIL_SCOPE,
+      prompt: "consent",
+    });
+    const popup = window.open(
+      `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+      "gmail_oauth",
+      "width=500,height=600,left=300,top=100"
+    );
+    if (!popup) { reject(new Error("Popup blocked — please allow popups for this site")); return; }
+    const timer = setInterval(() => {
+      try {
+        if (popup.closed) { clearInterval(timer); reject(new Error("Authorisation cancelled")); return; }
+        const url = popup.location.href;
+        if (url.includes(window.location.origin) && url.includes("access_token")) {
+          clearInterval(timer);
+          popup.close();
+          const hash = new URLSearchParams(popup.location.hash.slice(1));
+          const token = hash.get("access_token");
+          const expires = parseInt(hash.get("expires_in") || "3600");
+          if (token) { storeToken(token, expires); resolve(token); }
+          else reject(new Error("No token received"));
+        }
+      } catch(e) { /* cross-origin — still loading */ }
+    }, 300);
+    setTimeout(() => { clearInterval(timer); if (!popup.closed) popup.close(); reject(new Error("Authorisation timed out")); }, 120000);
+  });
+}
+
+async function getGmailToken() {
+  const stored = getStoredToken();
+  if (stored) return stored;
+  return await requestGmailToken();
+}
+
 function loadCP(){try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
 function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}}
 function loadImgs(){try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};}}
@@ -1028,11 +1092,13 @@ async function createGmailDraft(itinerary, allProducts) {
   const encoded = btoa(unescape(encodeURIComponent(rfcMessage)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
+  const token = await getGmailToken();
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
     body: JSON.stringify({ message: { raw: encoded } }),
   });
+  if (res.status === 401) { clearToken(); throw new Error("Gmail session expired — please try again"); }
 
   if (!res.ok) {
     const err = await res.json().catch(()=>({}));
@@ -1043,25 +1109,43 @@ async function createGmailDraft(itinerary, allProducts) {
 
 // ─── Gmail draft button ───────────────────────────────────────────────────────
 function EmailDraftButton({itinerary,allProducts}){
-  const[state,setState]=useState("idle"); // idle | loading | success | error
+  const[state,setState]=useState("idle");
   const[msg,setMsg]=useState("");
+  const[connected,setConnected]=useState(()=>!!getStoredToken());
+
   async function handleClick(){
     setState("loading");setMsg("");
     try{
       await createGmailDraft(itinerary,allProducts);
-      setState("success");setMsg("Draft created in Gmail");
-      setTimeout(()=>setState("idle"),3000);
+      setConnected(true);
+      setState("success");setMsg("Draft created in Gmail Drafts");
+      setTimeout(()=>setState("idle"),3500);
     }catch(e){
-      setState("error");setMsg(e.message||"Failed — check Gmail connection");
+      if(e.message?.includes("cancelled")||e.message?.includes("Popup")) setState("idle");
+      else setState("error");
+      setMsg(e.message||"Failed");
       setTimeout(()=>setState("idle"),4000);
     }
   }
+
+  function handleDisconnect(){
+    clearToken();setConnected(false);setMsg("");setState("idle");
+  }
+
   const bg=state==="success"?C.teal:state==="error"?C.terra:C.teal;
-  const label=state==="loading"?"Creating...":state==="success"?"✓ Draft created":state==="error"?"✗ Failed":"Email Draft";
+  const label=state==="loading"?"Creating draft...":state==="success"?"✓ Draft in Gmail":state==="error"?"✗ Error":"Gmail Draft";
+
   return(
-    <div style={{position:"relative",display:"inline-block"}}>
-      <button onClick={handleClick} disabled={state==="loading"} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:bg,border:"none",borderRadius:5,padding:"6px 12px",opacity:state==="loading"?0.7:1,cursor:state==="loading"?"not-allowed":"pointer"}}>{label}</button>
-      {msg&&state!=="idle"&&<div style={{position:"absolute",top:"calc(100% + 6px)",right:0,background:state==="success"?C.teal:C.terra,color:C.white,fontFamily:F.body,fontSize:10,borderRadius:5,padding:"4px 10px",whiteSpace:"nowrap",zIndex:10}}>{msg}</div>}
+    <div style={{position:"relative",display:"inline-flex",alignItems:"center",gap:4}}>
+      <button onClick={handleClick} disabled={state==="loading"} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:bg,border:"none",borderRadius:connected?"5px 0 0 5px":5,padding:"6px 12px",opacity:state==="loading"?0.7:1,cursor:state==="loading"?"not-allowed":"pointer"}}>
+        {!connected&&state==="idle"?"Connect Gmail":label}
+      </button>
+      {connected&&state==="idle"&&(
+        <button onClick={handleDisconnect} title="Disconnect Gmail" style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.7)",background:"rgba(64,192,192,0.4)",border:"none",borderRadius:"0 5px 5px 0",padding:"6px 8px",cursor:"pointer",borderLeft:"1px solid rgba(255,255,255,0.2)"}}>✕</button>
+      )}
+      {msg&&state!=="idle"&&(
+        <div style={{position:"absolute",top:"calc(100% + 6px)",right:0,background:state==="success"?C.teal:C.terra,color:C.white,fontFamily:F.body,fontSize:10,borderRadius:5,padding:"4px 10px",whiteSpace:"nowrap",zIndex:10,boxShadow:"0 2px 8px rgba(0,0,0,0.2)"}}>{msg}</div>
+      )}
     </div>
   );
 }
