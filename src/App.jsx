@@ -938,7 +938,7 @@ function ProductLibrary({ products, setProducts }) {
 }
 
 // ── Builder tab ───────────────────────────────────────────────────────────────
-function Builder({ products }) {
+function Builder({ products, loadedItinerary }) {
   const [meta, setMeta] = useLocalStorage("ce_meta", {
     title: "", guests: "", startDate: "", ref: ""
   });
@@ -946,12 +946,48 @@ function Builder({ products }) {
     { id: genId(), title: "Day 1", subtitle: "", blocks: [] }
   ]);
   const [mapsKey, setMapsKey] = useLocalStorage("ce_maps_key", "");
+  const [savedItineraries, setSavedItineraries] = useLocalStorage("ce_saved_itineraries", []);
+  const [currentId, setCurrentId] = useState(null);
+  const [currentStatus, setCurrentStatus] = useState("Draft");
+  const [saveMsg, setSaveMsg] = useState("");
+
+  function saveItinerary() {
+    const itinerary = {
+      id: currentId || genId(),
+      meta: { ...meta },
+      days: [...days],
+      status: currentStatus,
+      savedAt: new Date().toISOString(),
+    };
+    setSavedItineraries(s => {
+      const existing = s.findIndex(it => it.id === itinerary.id);
+      if (existing >= 0) {
+        const updated = [...s];
+        updated[existing] = itinerary;
+        return updated;
+      }
+      return [itinerary, ...s];
+    });
+    setCurrentId(itinerary.id);
+    setSaveMsg("Saved");
+    setTimeout(() => setSaveMsg(""), 2000);
+  }
   const [netlifyToken, setNetlifyToken] = useLocalStorage("ce_netlify_token", "");
   const [netlifySiteId, setNetlifySiteId] = useLocalStorage("ce_netlify_site", "");
   const [shareUrl, setShareUrl] = useState("");
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState("");
   const [activeView, setActiveView] = useState("build"); // "build" | "preview"
+
+  // Load itinerary when passed from Itineraries tab
+  useEffect(() => {
+    if (loadedItinerary) {
+      setMeta(loadedItinerary.meta || { title: "", guests: "", startDate: "", ref: "" });
+      setDays(loadedItinerary.days || [{ id: genId(), title: "Day 1", subtitle: "", blocks: [] }]);
+      setCurrentId(loadedItinerary.id);
+      setCurrentStatus(loadedItinerary.status || "Draft");
+    }
+  }, [loadedItinerary]);
   const [catFilter, setCatFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [dragId, setDragId] = useState(null);
@@ -1110,6 +1146,14 @@ function Builder({ products }) {
             <label style={S.label}>Reference</label>
             <input style={{ ...S.input, width: 110 }} value={meta.ref} onChange={e => setMf("ref", e.target.value)} placeholder="CE-2027-001" />
           </div>
+          <select style={{ ...S.input, width: 130 }} value={currentStatus} onChange={e => setCurrentStatus(e.target.value)}>
+            <option>Draft</option>
+            <option>Review</option>
+            <option>Published</option>
+          </select>
+          <button style={{ ...S.btnPrimary, background: saveMsg ? B.teal : B.navy, minWidth: 70 }} onClick={saveItinerary}>
+            {saveMsg || "Save"}
+          </button>
           <button style={S.btnSecondary} onClick={() => setActiveView("preview")}>Preview</button>
         </div>
 
@@ -1591,6 +1635,117 @@ body { font-family: 'Source Sans 3', system-ui, sans-serif; background: white; -
   return activeView === "build" ? buildView : previewView;
 }
 
+// ── ItineraryList tab ────────────────────────────────────────────────────────
+function ItineraryList({ onOpen }) {
+  const [saved, setSaved] = useLocalStorage("ce_saved_itineraries", []);
+  const [filter, setFilter] = useState("All");
+
+  const STATUS = ["All", "Draft", "Review", "Published"];
+
+  const statusColor = (s) => ({
+    Draft:     { bg: B.sandLight,      color: B.muted,  border: B.sand },
+    Review:    { bg: B.teal + "18",    color: B.teal,   border: B.teal + "60" },
+    Published: { bg: "#e8f5e9",        color: "#2e7d32", border: "#a5d6a7" },
+  }[s] || { bg: B.sandLight, color: B.muted, border: B.sand });
+
+  const visible = filter === "All" ? saved : saved.filter(it => it.status === filter);
+
+  function deleteItinerary(id) {
+    if (!window.confirm("Delete this itinerary? This cannot be undone.")) return;
+    setSaved(s => s.filter(it => it.id !== id));
+  }
+
+  function duplicateItinerary(it) {
+    const copy = { ...it, id: genId(), meta: { ...it.meta, ref: it.meta.ref + "-COPY" }, status: "Draft", savedAt: new Date().toISOString() };
+    setSaved(s => [copy, ...s]);
+  }
+
+  function changeStatus(id, status) {
+    setSaved(s => s.map(it => it.id === id ? { ...it, status } : it));
+  }
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: B.navy, marginBottom: 2 }}>Itineraries</div>
+          <div style={{ fontSize: 13, color: B.muted }}>{saved.length} saved · click any card to open in builder</div>
+        </div>
+        <button style={S.btnPrimary} onClick={() => onOpen(null)}>+ New itinerary</button>
+      </div>
+
+      {/* Status filter */}
+      <div style={S.catBar}>
+        {STATUS.map(s => (
+          <button key={s} style={S.catBtn(filter === s)} onClick={() => setFilter(s)}>{s}</button>
+        ))}
+      </div>
+
+      {visible.length === 0 && (
+        <div style={{ textAlign: "center", padding: "60px 0", color: B.muted, fontSize: 13, fontStyle: "italic" }}>
+          {saved.length === 0 ? "No itineraries saved yet. Build one in the Builder tab and click Save." : "No itineraries with this status."}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14, marginTop: 16 }}>
+        {visible.map(it => {
+          const sc = statusColor(it.status);
+          return (
+            <div key={it.id} style={{ background: B.white, border: `1px solid ${B.sand}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", transition: "box-shadow 0.15s" }}
+              onClick={() => onOpen(it)}>
+              {/* Status bar */}
+              <div style={{ background: B.navy, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: B.white, letterSpacing: "0.03em" }}>
+                  {it.meta?.ref || "No reference"}
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 20, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                  {it.status}
+                </span>
+              </div>
+
+              <div style={{ padding: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: B.navy, marginBottom: 4 }}>
+                  {it.meta?.title || "Untitled itinerary"}
+                </div>
+                <div style={{ fontSize: 12, color: B.muted, marginBottom: 2 }}>
+                  {it.meta?.guests || "No guest name"}
+                </div>
+                {it.meta?.startDate && (
+                  <div style={{ fontSize: 11, color: B.muted, marginBottom: 8 }}>
+                    {new Date(it.meta.startDate + "T00:00:00").toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: B.muted, marginBottom: 12 }}>
+                  {it.days?.length || 0} day{it.days?.length !== 1 ? "s" : ""} · {it.days?.reduce((acc, d) => acc + (d.blocks?.length || 0), 0) || 0} experiences
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }} onClick={e => e.stopPropagation()}>
+                  <select
+                    value={it.status}
+                    onChange={e => changeStatus(it.id, e.target.value)}
+                    style={{ ...S.input, fontSize: 11, padding: "4px 8px", flex: 1 }}
+                  >
+                    <option>Draft</option>
+                    <option>Review</option>
+                    <option>Published</option>
+                  </select>
+                  <button style={S.btnGhost} onClick={() => duplicateItinerary(it)}>Duplicate</button>
+                  <button style={S.btnDanger} onClick={() => deleteItinerary(it.id)}>Delete</button>
+                </div>
+
+                <div style={{ fontSize: 10, color: B.muted, marginTop: 8 }}>
+                  Saved {new Date(it.savedAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── FlightLookup ──────────────────────────────────────────────────────────────
 function FlightLookup() {
   const [apiKey, setApiKey] = useLocalStorage("ce_flight_api_key", "");
@@ -1887,8 +2042,14 @@ function FlightLookup() {
 
 // ── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab] = useState("builder");
+  const [tab, setTab] = useState("itineraries");
   const [products, setProducts] = useLocalStorage("ce_products", SEED_PRODUCTS);
+  const [loadedItinerary, setLoadedItinerary] = useState(null);
+
+  function handleOpenItinerary(it) {
+    setLoadedItinerary(it);
+    setTab("builder");
+  }
 
   return (
     <div style={S.app}>
@@ -1919,6 +2080,7 @@ export default function App() {
           </div>
         </div>
         <div style={S.tabs}>
+          <button style={S.tab(tab === "itineraries")} onClick={() => setTab("itineraries")}>Itineraries</button>
           <button style={S.tab(tab === "builder")} onClick={() => setTab("builder")}>Builder</button>
           <button style={S.tab(tab === "library")} onClick={() => setTab("library")}>Product Library</button>
           <button style={S.tab(tab === "flights")} onClick={() => setTab("flights")}>Flight Lookup</button>
@@ -1928,7 +2090,12 @@ export default function App() {
         </div>
       </div>
 
-      {tab === "builder" && <Builder products={products} />}
+      {tab === "itineraries" && (
+        <div style={{ overflowY: "auto", height: "calc(100vh - 56px)" }}>
+          <ItineraryList onOpen={handleOpenItinerary} />
+        </div>
+      )}
+      {tab === "builder" && <Builder products={products} loadedItinerary={loadedItinerary} />}
       {tab === "library" && <ProductLibrary products={products} setProducts={setProducts} />}
       {tab === "flights" && (
         <div style={{ overflowY: "auto", height: "calc(100vh - 56px)" }}>
