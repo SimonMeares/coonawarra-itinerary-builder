@@ -51,7 +51,7 @@ const SEED_PRODUCTS = [
     duration: "3–4 hours",
     description: "A world-class Wagyu beef tasting experience on one of Australia's most awarded Wagyu properties. Guests enjoy a multi-course hosted lunch or dinner featuring full-blood Wagyu scored at 9+ marble score, paired with premium Australian wines in a beautifully restored heritage shearing shed.",
     inclusions: ["Multi-course Wagyu degustation", "Wine pairing", "Hosted by the Scott family", "Property tour"],
-    image: "",
+    images: [],
     tag: "Signature"
   },
   {
@@ -63,7 +63,7 @@ const SEED_PRODUCTS = [
     duration: "1.5–2 hours",
     description: "A private hosted tasting of Wynns' most celebrated wines in the iconic ivy-clad cellar door. Guests explore the estate's flagship reds including John Riddoch Cabernet Sauvignon and Michael Shiraz, guided by one of the winery's senior hosts.",
     inclusions: ["Private hosted tasting", "Icon wine lineup", "Cellar door access", "Educational overview of terra rossa terroir"],
-    image: "",
+    images: [],
     tag: "Signature"
   },
   {
@@ -75,7 +75,7 @@ const SEED_PRODUCTS = [
     duration: "1–2 hours",
     description: "A private encounter with an Eastern Grey kangaroo mob at dusk or dawn on a working property. Guests are guided to a sheltered viewing point where the mob gathers to graze, offering close and unhurried observation in a completely natural setting.",
     inclusions: ["Guided wildlife experience", "Private property access", "Sunset or sunrise timing"],
-    image: "",
+    images: [],
     tag: ""
   },
   {
@@ -87,7 +87,7 @@ const SEED_PRODUCTS = [
     duration: "Overnight",
     description: "A beautifully appointed private retreat set among native gardens on the Warrawindi property. The Blue Wren Retreat sleeps two in a king bedroom with ensuite, full kitchen, and private outdoor firepit overlooking the vines.",
     inclusions: ["One or more nights accommodation", "Continental breakfast provisions", "Private outdoor firepit", "Vineyard outlook"],
-    image: "",
+    images: [],
     tag: "Partner"
   },
   {
@@ -99,7 +99,7 @@ const SEED_PRODUCTS = [
     duration: "2–3 hours",
     description: "Coonawarra's most celebrated restaurant, set in a converted stone stable and surrounded by vines. Ottelia's menu draws on the best of the Limestone Coast — from local beef and lamb to fresh seafood from the Southern Ocean — paired with the region's finest wines.",
     inclusions: ["Two or three course menu", "Matched wine option available", "Private or semi-private dining"],
-    image: "",
+    images: [],
     tag: ""
   },
   {
@@ -111,7 +111,7 @@ const SEED_PRODUCTS = [
     duration: "45–60 minutes",
     description: "A guided tasting and tour at one of South Australia's finest boutique olive oil producers. Guests learn about cold-press production, taste through the current release oils, and have the opportunity to purchase direct from the estate.",
     inclusions: ["Guided estate tour", "Guided oil tasting", "Producer Q&A"],
-    image: "",
+    images: [],
     tag: ""
   },
   {
@@ -123,7 +123,7 @@ const SEED_PRODUCTS = [
     duration: "2–3 hours",
     description: "A private guided tour of Naracoorte's World Heritage-listed cave system, home to the fossil remains of megafauna dating back 500,000 years. One of just eight natural World Heritage sites in Australia and consistently one of the most remarkable experiences on the Limestone Coast.",
     inclusions: ["Private guided cave tour", "Fossil chamber access", "World Heritage briefing"],
-    image: "",
+    images: [],
     tag: "Heritage"
   },
   {
@@ -135,7 +135,7 @@ const SEED_PRODUCTS = [
     duration: "1.5–2 hours",
     description: "A private tour of Yallum Park, one of South Australia's finest pastoral homesteads and a property steeped in Limestone Coast history. Guests explore the homestead's grand rooms, formal gardens, and working farm with a privately hosted guide.",
     inclusions: ["Private homestead tour", "Garden walk", "Historical briefing", "Morning or afternoon tea"],
-    image: "",
+    images: [],
     tag: "Heritage"
   },
   {
@@ -147,7 +147,7 @@ const SEED_PRODUCTS = [
     duration: "2–3 hours",
     description: "A deeply personal guided experience with Uncle Ken Jones, a Boandik Elder and custodian of Country across the Limestone Coast. Guests walk Country with Uncle Ken, learning about Boandik connection to land, water, and sky through story, song, and lived experience.",
     inclusions: ["Guided walk on Country", "Cultural storytelling", "Hosted by Uncle Ken Jones (Boandik people)"],
-    image: "",
+    images: [],
     tag: "Signature"
   },
   {
@@ -159,7 +159,7 @@ const SEED_PRODUCTS = [
     duration: "2.5–3 hours",
     description: "A leisurely set menu lunch at Parker Estate, one of Coonawarra's most intimate cellar doors. The menu is designed around the estate's current releases — typically a Cabernet Sauvignon and Shiraz program — matched course by course in a private dining setting overlooking the vines.",
     inclusions: ["Set menu lunch", "Matched wine pairing", "Private dining setting", "Winery host"],
-    image: "",
+    images: [],
     tag: ""
   },
   {
@@ -171,7 +171,7 @@ const SEED_PRODUCTS = [
     duration: "2–3 days",
     description: "A fully hosted private transfer from Melbourne to Adelaide (or Coonawarra) along the Great Ocean Road and through the Grampians. Guests travel in a premium vehicle with Simon or a trusted host, stopping at key highlights along the way. This is not a transfer — it is the beginning of the journey.",
     inclusions: ["Private vehicle and host", "Great Ocean Road highlights", "Grampians overnight (optional)", "Flexible pace and routing"],
-    image: "",
+    images: [],
     tag: "Transfer"
   },
 ];
@@ -651,65 +651,70 @@ const S = {
   },
 };
 
-// ── ImageUploader ─────────────────────────────────────────────────────────────
-function ImageUploader({ value, onChange }) {
+// ── ImageGalleryUploader ─────────────────────────────────────────────────────
+function ImageGalleryUploader({ images = [], onChange }) {
   const [dragOver, setDragOver] = useState(false);
   const [urlMode, setUrlMode] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const fileRef = useRef();
+  const MIN = 3;
+  const MAX = 10;
 
   function readFile(file) {
     if (!file || !file.type.startsWith("image/")) return;
+    if (images.length >= MAX) return;
     const reader = new FileReader();
-    reader.onload = (e) => onChange(e.target.result);
+    reader.onload = (e) => onChange([...images, e.target.result]);
     reader.readAsDataURL(file);
   }
 
   function handleDrop(e) {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) readFile(file);
+    Array.from(e.dataTransfer.files).slice(0, MAX - images.length).forEach(readFile);
   }
 
   function handleFileInput(e) {
-    const file = e.target.files[0];
-    if (file) readFile(file);
+    Array.from(e.target.files).slice(0, MAX - images.length).forEach(readFile);
   }
 
   function applyUrl() {
-    if (urlInput.trim()) onChange(urlInput.trim());
+    if (urlInput.trim() && images.length < MAX) {
+      onChange([...images, urlInput.trim()]);
+    }
     setUrlMode(false);
     setUrlInput("");
   }
 
-  const dropZoneStyle = {
-    border: `2px dashed ${dragOver ? B.teal : B.sand}`,
-    borderRadius: 8,
-    background: dragOver ? B.teal + "0e" : B.bg,
-    padding: value ? 0 : "20px 16px",
-    textAlign: "center",
-    cursor: "pointer",
-    transition: "all 0.15s",
-    overflow: "hidden",
-    position: "relative",
-  };
+  function removeImage(idx) {
+    onChange(images.filter((_, i) => i !== idx));
+  }
+
+  function moveImage(idx, dir) {
+    const newImages = [...images];
+    const target = idx + dir;
+    if (target < 0 || target >= newImages.length) return;
+    [newImages[idx], newImages[target]] = [newImages[target], newImages[idx]];
+    onChange(newImages);
+  }
+
+  const canAdd = images.length < MAX;
 
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <label style={S.label}>Product image</label>
+        <label style={S.label}>
+          Product images
+          <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, marginLeft: 6, color: images.length < MIN ? B.terra : B.teal }}>
+            {images.length}/{MAX} {images.length < MIN ? `(min ${MIN} required)` : ""}
+          </span>
+        </label>
         <div style={{ display: "flex", gap: 6 }}>
-          {value && (
-            <button
-              style={{ ...S.btnDanger, fontSize: 10, padding: "2px 8px" }}
-              onClick={() => onChange("")}
-            >Remove</button>
+          {canAdd && (
+            <button style={{ ...S.btnGhost, fontSize: 10, padding: "2px 8px" }} onClick={() => setUrlMode(v => !v)}>
+              {urlMode ? "Cancel" : "Paste URL"}
+            </button>
           )}
-          <button
-            style={{ ...S.btnGhost, fontSize: 10, padding: "2px 8px" }}
-            onClick={() => setUrlMode(v => !v)}
-          >{urlMode ? "Cancel URL" : "Paste URL"}</button>
         </div>
       </div>
 
@@ -723,53 +728,54 @@ function ImageUploader({ value, onChange }) {
             onKeyDown={e => e.key === "Enter" && applyUrl()}
             autoFocus
           />
-          <button style={S.btnPrimary} onClick={applyUrl}>Use</button>
+          <button style={S.btnPrimary} onClick={applyUrl}>Add</button>
         </div>
       )}
 
-      <div
-        style={dropZoneStyle}
-        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        onClick={() => !value && fileRef.current?.click()}
-      >
-        {value ? (
-          <div style={{ position: "relative" }}>
-            <img
-              src={value}
-              alt="Product"
-              style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }}
-              onError={() => onChange("")}
-            />
-            <button
-              style={{
-                position: "absolute", top: 8, right: 8,
-                background: "rgba(25,41,87,0.75)", color: B.white,
-                border: "none", borderRadius: 4, padding: "4px 10px",
-                fontSize: 11, cursor: "pointer", fontFamily: "inherit",
-              }}
-              onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
-            >Change photo</button>
-          </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.35 }}>⬆</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: B.navy, marginBottom: 4 }}>
-              {dragOver ? "Drop to upload" : "Click to upload or drag a photo here"}
+      {/* Existing images */}
+      {images.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8, marginBottom: 8 }}>
+          {images.map((img, i) => (
+            <div key={i} style={{ position: "relative", borderRadius: 6, overflow: "hidden", border: `2px solid ${i === 0 ? B.teal : B.sand}` }}>
+              <img src={img} alt={`Image ${i+1}`} style={{ width: "100%", height: 80, objectFit: "cover", display: "block" }} />
+              {i === 0 && (
+                <div style={{ position: "absolute", top: 4, left: 4, background: B.teal, color: B.white, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, letterSpacing: "0.05em" }}>HERO</div>
+              )}
+              <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 2 }}>
+                {i > 0 && <button onClick={() => moveImage(i, -1)} style={{ background: "rgba(25,41,87,0.7)", color: "white", border: "none", borderRadius: 3, width: 18, height: 18, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>}
+                {i < images.length - 1 && <button onClick={() => moveImage(i, 1)} style={{ background: "rgba(25,41,87,0.7)", color: "white", border: "none", borderRadius: 3, width: 18, height: 18, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>→</button>}
+                <button onClick={() => removeImage(i)} style={{ background: "rgba(211,71,39,0.8)", color: "white", border: "none", borderRadius: 3, width: 18, height: 18, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: B.muted }}>JPG, PNG, WebP — or paste a URL above</div>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        style={{ display: "none" }}
-        onChange={handleFileInput}
-      />
+      {/* Drop zone — only show if can add more */}
+      {canAdd && (
+        <div
+          style={{
+            border: `2px dashed ${dragOver ? B.teal : B.sand}`,
+            borderRadius: 8,
+            background: dragOver ? B.teal + "0e" : B.bg,
+            padding: "16px",
+            textAlign: "center",
+            cursor: "pointer",
+            transition: "all 0.15s",
+          }}
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileRef.current?.click()}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, color: B.navy, marginBottom: 2 }}>
+            {dragOver ? "Drop to add" : `Click or drag photos to add (${images.length}/${MAX})`}
+          </div>
+          <div style={{ fontSize: 11, color: B.muted }}>JPG, PNG, WebP — first image becomes the hero</div>
+        </div>
+      )}
+
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileInput} />
     </div>
   );
 }
@@ -778,10 +784,10 @@ function ImageUploader({ value, onChange }) {
 function ProductModal({ product, onSave, onClose }) {
   const empty = {
     id: genId(), category: "Food & Wine", title: "", subtitle: "", location: "", duration: "",
-    description: "", inclusions: "", tag: "", image: ""
+    description: "", inclusions: "", tag: "", images: []
   };
   const init = product
-    ? { ...product, inclusions: (product.inclusions || []).join("\n") }
+    ? { ...product, inclusions: (product.inclusions || []).join("\n"), images: product.images || (product.image ? [product.image] : []) }
     : empty;
   const [form, setForm] = useState(init);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -821,7 +827,7 @@ function ProductModal({ product, onSave, onClose }) {
           <input style={S.input} value={form.location || ""} onChange={e => set("location", e.target.value)} placeholder="e.g. Wynns Coonawarra Estate, Memorial Drive, Coonawarra SA 5263, Australia" />
         </div>
 
-        <ImageUploader value={form.image} onChange={v => set("image", v)} />
+        <ImageGalleryUploader images={form.images || []} onChange={v => set("images", v)} />
 
         <div style={S.formFull}>
           <label style={{ ...S.label, display: "block", marginBottom: 4 }}>Description</label>
@@ -837,7 +843,8 @@ function ProductModal({ product, onSave, onClose }) {
             if (!form.title.trim()) return;
             onSave({
               ...form,
-              inclusions: form.inclusions.split("\n").map(s => s.trim()).filter(Boolean)
+              inclusions: form.inclusions.split("\n").map(s => s.trim()).filter(Boolean),
+              images: form.images || []
             });
           }}>
             {product ? "Save changes" : "Add to library"}
@@ -891,9 +898,14 @@ function ProductLibrary({ products, setProducts }) {
       <div style={S.libGrid}>
         {visible.map(p => (
           <div key={p.id} style={S.libCard}>
-            {p.image && (
-              <div style={{ height: 120, borderRadius: 6, marginBottom: 10, overflow: "hidden", background: B.sandLight }}>
-                <img src={p.image} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            {p.images && p.images[0] && (
+              <div style={{ position: "relative", height: 120, borderRadius: 6, marginBottom: 10, overflow: "hidden", background: B.sandLight }}>
+                <img src={p.images[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                {p.images.length > 1 && (
+                  <div style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(25,41,87,0.75)", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10 }}>
+                    +{p.images.length - 1} more
+                  </div>
+                )}
               </div>
             )}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
@@ -1062,9 +1074,9 @@ function Builder({ products }) {
               onDragEnd={onDragEnd}
               title="Drag into a day below"
             >
-              {p.image && (
+              {p.images && p.images[0] && (
                 <div style={{ height: 72, borderRadius: 5, marginBottom: 8, overflow: "hidden", background: B.sandLight }}>
-                  <img src={p.image} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+                  <img src={p.images[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
                 </div>
               )}
               <div style={S.productCardTitle}>{p.title}</div>
@@ -1502,9 +1514,20 @@ body { font-family: 'Source Sans 3', system-ui, sans-serif; background: white; -
                 if (!product) return null;
                 return (
                   <div key={block.id} style={{ borderBottom: `1px solid ${B.sandLight}` }}>
-                    {product.image && (
-                      <div style={{ height: 200, overflow: "hidden", background: B.sandLight }}>
-                        <img src={product.image} alt={product.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    {product.images && product.images[0] && (
+                      <div>
+                        <div style={{ height: 200, overflow: "hidden", background: B.sandLight }}>
+                          <img src={product.images[0]} alt={product.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        </div>
+                        {product.images.length > 1 && (
+                          <div style={{ display: "flex", gap: 4, padding: "6px 8px", background: B.sandLight }}>
+                            {product.images.slice(1).map((img, i) => (
+                              <div key={i} style={{ flex: 1, height: 60, overflow: "hidden", borderRadius: 4 }}>
+                                <img src={img} alt={`${product.title} ${i+2}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div style={{ padding: "20px 32px", display: "flex", gap: 20 }}>
