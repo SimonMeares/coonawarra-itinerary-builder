@@ -176,26 +176,27 @@ function generateCERef(existingItineraries) {
 }
 
 function newDay(index){
-  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:""};
+  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:"",internalNotes:""};
 }
 
 function newItinerary(){
   return{
     id:uid(),ceRef:"",rezdyRef:"",title:"New Itinerary",clientName:"",clientEmail:"",
     guestCount:2,arrivalDate:"",departureDate:"",origin:"Melbourne",
-    status:"draft",totalPrice:"",expiryDate:"",showPricing:false,tradeMode:false,commission:20,printFlow:false,
+    status:"draft",totalPrice:"",expiryDate:"",bookByDate:"",showPricing:false,tradeMode:false,commission:20,printFlow:false,agentLogo:"",agentName:"",agentRef:"",
     intro:"",hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they've built with the region's people, places and producers.",
-    emailIntro:"",beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
+    welcomeMessage:"",emailIntro:"",beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
     terms:DEFAULT_TERMS,notes:"",
     coverImage:"",attachments:[],
     guestInfo:{name1:"",name2:"",email:"",phone:"",country:"",dietary:"",medical:"",celebrating:"",notes:""},
-    days:[newDay(1)],
+    internalNotes:"",showInclusions:true,followUpDate:"",statusHistory:[],days:[newDay(1)],
     createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
   };
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const CL_CLOUD="dgzv5n4f3";
+const REZDY_BASE="https://coonawarraexperiences.rezdy.com/";
 const LOGO_URL="https://res.cloudinary.com/dgzv5n4f3/image/upload/f_auto,q_auto,w_300/Coonawarra-Experiences-Logo-Portrait-Reverse-Transparent-300dpi-RGB_olm9ho.png";
 const CL_PRESET="ce_unsigned";
 
@@ -302,7 +303,7 @@ function saveTemplates(t){try{localStorage.setItem("ce_templates_v1",JSON.string
 const CSS=`
 @import url('https://fonts.googleapis.com/css2?family=Cabin:wght@400;600;700&family=PT+Serif:ital@0;1&family=Source+Sans+3:wght@300;400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{margin:0;background:#faf9f6;font-family:'Source Sans 3','Open Sans',sans-serif;}
+body{margin:0;background:#faf9f6;font-family:'Source Sans 3','Open Sans',sans-serif;counter-reset:page-num;}
 input,textarea,select,button{font-family:inherit;}
 ::-webkit-scrollbar{width:5px;}
 ::-webkit-scrollbar-track{background:#f4f3f0;}
@@ -317,7 +318,14 @@ input,textarea,select,button{font-family:inherit;}
   .no-print{display:none!important;}
   body{background:white;}
   .print-break{page-break-before:always;}
-  @page{margin:12mm;size:A4;}
+  .cover-page{page-break-after:always;}
+  .divider-page{page-break-before:always;page-break-after:always;}
+  @page{margin:0;size:A4;}
+  @page:not(:first){margin:12mm;}
+  .page-content{padding:12mm;}
+  .print-page-num::after{content:counter(page);}
+  body{counter-reset:page;}
+  .print-break{counter-increment:page;}
 }
 `;
 
@@ -329,6 +337,25 @@ function Badge({color,children,xs}){
 function TierTable({pricing}){
   if(!["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(pricing.structure)||!pricing.tiers?.length)return null;
   return<table style={{width:"100%",borderCollapse:"collapse",marginTop:4}}><tbody>{pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"2px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,textAlign:"right",fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>;
+}
+
+// ─── Agent logo uploader ──────────────────────────────────────────────────────
+function AgentLogoUploader({onUpload}){
+  const inputRef=useRef();
+  const[uploading,setUploading]=useState(false);
+  async function handleFile(file){
+    if(!file||!file.type.startsWith("image/"))return;
+    setUploading(true);
+    try{const url=await uploadToCloudinary(file);onUpload(url);}
+    catch(e){alert("Upload failed — try again.");}
+    finally{setUploading(false);}
+  }
+  return(
+    <div className="pdf-drop" onClick={()=>!uploading&&inputRef.current.click()} style={{textAlign:"center",padding:"10px"}}>
+      <div style={{fontFamily:F.body,fontSize:11,color:uploading?C.teal:C.grey400}}>{uploading?"⏳ Uploading...":"🏢 Click to upload agent logo"}</div>
+      <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+    </div>
+  );
 }
 
 // ─── Cover image uploader ─────────────────────────────────────────────────────
@@ -665,6 +692,65 @@ function ProductForm({initial,onSave,onCancel}){
   );
 }
 
+// ─── Bulk image uploader ──────────────────────────────────────────────────────
+function BulkImageUploader({allProducts,productImages,onImagesChange}){
+  const[open,setOpen]=useState(false);
+  const[uploading,setUploading]=useState(null); // product name being uploaded
+  const[done,setDone]=useState([]);
+  const inputRef=useRef();
+  const[targetProduct,setTargetProduct]=useState(null);
+
+  async function handleFiles(files,productId){
+    const p=allProducts.find(x=>x.id===productId);
+    setUploading(p?.name||"product");
+    try{
+      const urls=await Promise.all(Array.from(files).filter(f=>f.type.startsWith("image/")).map(f=>uploadToCloudinary(f)));
+      onImagesChange(productId,[...(productImages[productId]||[]),...urls]);
+      setDone(d=>[...d,productId]);
+    }catch(e){alert(`Upload failed for ${p?.name}`);}
+    finally{setUploading(null);setTargetProduct(null);}
+  }
+
+  if(!open)return(
+    <button onClick={()=>setOpen(true)} style={{fontFamily:F.body,fontSize:10,color:C.grey600,background:C.grey100,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"3px 10px"}} title="Bulk image upload">📷 Images</button>
+  );
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.6)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setOpen(false)}>
+      <div style={{background:C.white,borderRadius:12,width:600,maxHeight:"80vh",overflow:"hidden",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+        <div style={{background:C.navy,padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.white}}>Bulk Image Upload</div>
+          <button onClick={()=>setOpen(false)} style={{color:"rgba(255,255,255,0.6)",background:"transparent",border:"none",fontSize:18,lineHeight:1}}>×</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:14}}>
+          {uploading&&<div style={{fontFamily:F.body,fontSize:12,color:C.teal,marginBottom:10,textAlign:"center"}}>⏳ Uploading to {uploading}...</div>}
+          {allProducts.filter(p=>p.category!=="Experience Components").map(p=>{
+            const imgs=productImages[p.id]||[];
+            const isDone=done.includes(p.id);
+            return(
+              <div key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:isDone?`${C.teal}10`:C.grey100,borderRadius:7,marginBottom:5,border:`1px solid ${isDone?C.teal:C.grey200}`}}>
+                {imgs[0]?<img src={imgs[0]} alt="" style={{width:40,height:32,objectFit:"cover",borderRadius:4,flexShrink:0}} crossOrigin="anonymous"/>:<div style={{width:40,height:32,background:C.grey200,borderRadius:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>📷</div>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{imgs.length} image{imgs.length!==1?"s":""} · {p.category}</div>
+                </div>
+                <div style={{display:"flex",gap:5,flexShrink:0}}>
+                  {isDone&&<span style={{fontFamily:F.body,fontSize:10,color:C.teal,fontWeight:600}}>✓ Done</span>}
+                  <button onClick={()=>{setTargetProduct(p.id);inputRef.current.click();}} disabled={!!uploading} style={{fontFamily:F.body,fontSize:10,fontWeight:600,color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"3px 10px",opacity:uploading?0.5:1}}>
+                    {imgs.length>0?"Add":"Upload"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <input ref={inputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{if(targetProduct)handleFiles(e.target.files,targetProduct);}}/>
+        <div style={{padding:"10px 14px",borderTop:`1px solid ${C.grey200}`,fontFamily:F.body,fontSize:11,color:C.grey400,textAlign:"center"}}>Click Upload next to any product to add images · Images go to Cloudinary</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Library card ─────────────────────────────────────────────────────────────
 function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,onDelete,onDuplicate}){
   const[open,setOpen]=useState(false);
@@ -793,7 +879,8 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
             onNoteChange={(itemId,note)=>onNoteChange(day.id,itemId,note)}
           />
         ))}
-        <textarea value={day.dayNotes} onChange={e=>onUpdate({...day,dayNotes:e.target.value})} placeholder="Day overview notes..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:36,outline:"none",marginTop:4}}/>
+        <textarea value={day.dayNotes} onChange={e=>onUpdate({...day,dayNotes:e.target.value})} placeholder="Day overview notes (appears in itinerary)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:36,outline:"none",marginTop:4}}/>
+        <textarea value={day.internalNotes||""} onChange={e=>onUpdate({...day,internalNotes:e.target.value})} placeholder="Internal notes — operational reminders, supplier contacts (never shown to client)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.terra,border:`1px solid ${C.terra}30`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:32,outline:"none",marginTop:4,background:"#fff8f6"}}/>
       </div>
     </div>
   );
@@ -807,55 +894,136 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
   const showPrice=itinerary.showPricing;
   return(
     <div style={{fontFamily:F.body,color:C.text,maxWidth:860,margin:"0 auto"}}>
-      {/* Cover */}
-      <div style={{background:C.navy,borderRadius:10,padding:"28px 32px",marginBottom:16,position:"relative",overflow:"hidden"}}>
-        {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",opacity:0.18,display:"block"}} crossOrigin="anonymous"/>}
-        <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:C.teal,opacity:0.1,borderRadius:"0 0 0 100%"}}/>
-        <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:90,width:"auto",marginBottom:10,display:"block"}} crossOrigin="anonymous"/>
-        <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white,lineHeight:1.1,marginBottom:6}}>{itinerary.title||"Private Itinerary"}</div>
-        {isTrade&&<div style={{display:"inline-block",background:C.terra,borderRadius:5,padding:"2px 10px",marginBottom:10,fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,letterSpacing:"0.1em",textTransform:"uppercase"}}>Trade Partner Rate Sheet · {comm}% Commission</div>}
-        {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.sand,marginBottom:14}}>{isTrade?"Prepared for trade partner:":"Prepared for"} {itinerary.clientName}</div>}
-        <div style={{display:"flex",gap:20,flexWrap:"wrap",marginBottom:14}}>
-          {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
-          {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
-          {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
-          <div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {itinerary.days.length} {itinerary.days.length===1?"day":"days"}</div>
-          {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
-        </div>
-        {itinerary.totalPrice&&(
-          <div style={{display:"inline-block",background:"rgba(255,255,255,0.1)",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:14}}>
-            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{isTrade?"Total (net rates)":"Total investment"}</div>
-            <div style={{fontFamily:F.heading,fontSize:20,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
-            {currency&&currency!=="AUD"&&itinerary.totalPrice&&(()=>{
-              const num=parseFloat((itinerary.totalPrice||"").replace(/[^0-9.]/g,""));
-              if(!num||!fxRates) return null;
-              const rate=fxRates[currency];
-              const symbols={NZD:"NZ$",GBP:"£",USD:"US$",SGD:"S$",EUR:"€"};
-              if(!rate) return null;
-              return<div style={{fontFamily:F.body,fontSize:11,color:C.sand,marginTop:2}}>approx. {symbols[currency]}{Math.round(num*rate).toLocaleString()} {currency}</div>;
-            })()}
-          </div>
-        )}
-        {highlights.length>0&&(
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:14,borderTop:`1px solid rgba(255,255,255,0.12)`}}>
-            {highlights.map((h,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.08)",borderRadius:6,padding:"4px 10px"}}>
-                <span style={{fontSize:13}}>{h.icon}</span>
-                <span style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.8)"}}>{h.label}</span>
+      {/* Cover — trade and guest have separate layouts */}
+      {isTrade?(
+        /* ── TRADE COVER ── */
+        <div style={{background:C.navy,borderRadius:10,marginBottom:16,position:"relative",overflow:"hidden"}}>
+          {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",opacity:0.12,display:"block"}} crossOrigin="anonymous"/>}
+          <div style={{position:"relative",padding:"28px 32px"}}>
+            {/* CE logo + agent logo row */}
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
+              <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:80,width:"auto",display:"block"}} crossOrigin="anonymous"/>
+              {itinerary.agentLogo&&(
+                <div style={{background:"rgba(255,255,255,0.95)",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <img src={itinerary.agentLogo} alt={itinerary.agentName||"Agent"} style={{maxHeight:50,maxWidth:140,objectFit:"contain",display:"block"}} crossOrigin="anonymous"/>
+                </div>
+              )}
+            </div>
+            {/* Confidential notice */}
+            <div style={{background:"rgba(211,71,39,0.15)",border:"1px solid rgba(211,71,39,0.4)",borderRadius:5,padding:"4px 12px",marginBottom:14,display:"inline-block"}}>
+              <span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase"}}>Confidential · Trade rate sheet · Not for distribution to end guests</span>
+            </div>
+            {/* Title */}
+            <div style={{fontFamily:F.heading,fontSize:26,fontWeight:700,color:C.white,lineHeight:1.1,marginBottom:8}}>{itinerary.title||"Private Itinerary"}</div>
+            {/* Agent details */}
+            {itinerary.agentName&&<div style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.sand,marginBottom:2}}>Prepared for {itinerary.agentName}{itinerary.clientName?` · Guest: ${itinerary.clientName}`:""}</div>}
+            {itinerary.agentRef&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.45)",marginBottom:14}}>Agent ref: {itinerary.agentRef}</div>}
+            {!itinerary.agentName&&itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.sand,marginBottom:14}}>Guest: {itinerary.clientName}</div>}
+            {/* Journey details */}
+            <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:14}}>
+              {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
+              {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
+              {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
+              <div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {itinerary.days.length} {itinerary.days.length===1?"day":"days"}</div>
+              {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
+            </div>
+            {/* Commission + Book by boxes */}
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>
+              <div style={{background:"rgba(211,71,39,0.2)",border:"1px solid rgba(211,71,39,0.4)",borderRadius:6,padding:"8px 16px"}}>
+                <div style={{fontFamily:F.body,fontSize:9,color:C.terra,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>Commission</div>
+                <div style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.white}}>{comm}%</div>
               </div>
-            ))}
-          </div>
-        )}
-        <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid rgba(255,255,255,0.1)`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-          <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.35)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
-          <div style={{display:"flex",gap:12,alignItems:"center"}}>
-            {itinerary.expiryDate&&<div style={{fontFamily:F.body,fontSize:9,color:C.terra,fontWeight:600}}>Quote valid until {fmtDate(itinerary.expiryDate)}</div>}
-            {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.5)"}}><span style={{color:C.sand}}>Ref</span> {itinerary.ceRef}</div>}
-            {itinerary.rezdyRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.5)"}}><span style={{color:C.sand}}>Rezdy</span> {itinerary.rezdyRef}</div>}
+              {itinerary.totalPrice&&<div style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"8px 16px"}}>
+                <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>Total (net rates)</div>
+                <div style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
+              </div>}
+              {itinerary.bookByDate&&<div style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"8px 16px"}}>
+                <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>Book by</div>
+                <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.white}}>{fmtDate(itinerary.bookByDate)}</div>
+              </div>}
+              {itinerary.expiryDate&&<div style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"8px 16px"}}>
+                <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:2}}>Quote valid until</div>
+                <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.terra}}>{fmtDate(itinerary.expiryDate)}</div>
+              </div>}
+            </div>
+            {/* Footer refs */}
+            <div style={{paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.1)",display:"flex",gap:14,flexWrap:"wrap"}}>
+              <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.3)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+              {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.4)"}}><span style={{color:C.sand}}>CE Ref</span> {itinerary.ceRef}</div>}
+              {itinerary.rezdyRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.4)"}}><span style={{color:C.sand}}>Rezdy</span> {itinerary.rezdyRef}</div>}
+              {itinerary.agentRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.4)"}}><span style={{color:C.sand}}>Agent ref</span> {itinerary.agentRef}</div>}
+            </div>
           </div>
         </div>
-      </div>
-
+      ):(
+        /* ── GUEST COVER — full page ── */
+        <div className="cover-page no-print-border" style={{background:C.navy,position:"relative",overflow:"hidden",minHeight:480,display:"flex",flexDirection:"column",justifyContent:"space-between",borderRadius:10,marginBottom:20}}>
+          {/* Hero image — full bleed */}
+          {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>}
+          {/* Dark overlay so text is always readable */}
+          <div style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",background:itinerary.coverImage?"linear-gradient(to bottom, rgba(25,41,87,0.55) 0%, rgba(25,41,87,0.3) 40%, rgba(25,41,87,0.85) 100%)":"rgba(25,41,87,1)"}}/>
+          {/* Teal accent circle — only when no hero image */}
+          {!itinerary.coverImage&&<div style={{position:"absolute",top:0,right:0,width:200,height:200,background:C.teal,opacity:0.08,borderRadius:"0 0 0 100%"}}/>}
+          {/* Content */}
+          <div style={{position:"relative",padding:"32px 36px",flex:1,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+            {/* Top — logo */}
+            <div>
+              <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:80,width:"auto",display:"block",marginBottom:0}} crossOrigin="anonymous"/>
+            </div>
+            {/* Middle — title and welcome */}
+            <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",paddingTop:32,paddingBottom:24}}>
+              <div style={{fontFamily:F.heading,fontSize:36,fontWeight:700,color:C.white,lineHeight:1.05,marginBottom:12,textShadow:itinerary.coverImage?"0 2px 8px rgba(0,0,0,0.4)":"none"}}>{itinerary.title||"Private Itinerary"}</div>
+              {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:16,fontStyle:"italic",color:C.sand,marginBottom:16,textShadow:itinerary.coverImage?"0 1px 4px rgba(0,0,0,0.4)":"none"}}>Prepared for {itinerary.clientName}</div>}
+              {itinerary.welcomeMessage&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:"rgba(255,255,255,0.85)",lineHeight:1.7,maxWidth:520,textShadow:itinerary.coverImage?"0 1px 4px rgba(0,0,0,0.4)":"none",whiteSpace:"pre-wrap"}}>{itinerary.welcomeMessage}</div>}
+            </div>
+            {/* Bottom — details, price, highlights */}
+            <div>
+              {/* Key details row */}
+              <div style={{display:"flex",gap:18,flexWrap:"wrap",marginBottom:14}}>
+                {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
+                {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
+                {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
+                <div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {itinerary.days.length} {itinerary.days.length===1?"day":"days"}</div>
+                {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
+              </div>
+              {/* Total price */}
+              {itinerary.totalPrice&&(
+                <div style={{display:"inline-block",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"8px 18px",marginBottom:16}}>
+                  <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Total investment</div>
+                  <div style={{fontFamily:F.heading,fontSize:22,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
+                  {currency&&currency!=="AUD"&&(()=>{
+                    const num=parseFloat((itinerary.totalPrice||"").replace(/[^0-9.]/g,""));
+                    if(!num||!fxRates)return null;
+                    const rate=fxRates[currency];
+                    const symbols={NZD:"NZ$",GBP:"£",USD:"US$",SGD:"S$",EUR:"€"};
+                    if(!rate)return null;
+                    return<div style={{fontFamily:F.body,fontSize:11,color:C.sand,marginTop:1}}>approx. {symbols[currency]}{Math.round(num*rate).toLocaleString()} {currency}</div>;
+                  })()}
+                </div>
+              )}
+              {/* Highlights strip */}
+              {highlights.length>0&&(
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+                  {highlights.map((h,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"4px 10px"}}>
+                      <span style={{fontSize:13}}>{h.icon}</span>
+                      <span style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.85)"}}>{h.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Footer bar */}
+              <div style={{paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.3)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+                <div style={{display:"flex",gap:12}}>
+                  {itinerary.expiryDate&&<div style={{fontFamily:F.body,fontSize:9,color:C.terra,fontWeight:600}}>Quote valid until {fmtDate(itinerary.expiryDate)}</div>}
+                  {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.4)"}}><span style={{color:C.sand}}>Ref</span> {itinerary.ceRef}</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Intro */}
       {itinerary.intro&&(
         <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
@@ -910,8 +1078,32 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                           {isTrade?(()=>{
                             const n=netPrice(p.pricing,comm);
                             if(!n)return<div style={{fontFamily:F.heading,fontSize:12,color:C.terra}}>POA</div>;
-                            if(n.tiered)return<div>{n.tiered.map((t,i)=><div key={i} style={{fontFamily:F.body,fontSize:11,color:C.grey600}}>{t.label}: <span style={{fontFamily:F.heading,fontWeight:700,color:C.terra}}>${t.net.toLocaleString()}</span></div>)}<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:1}}>Net {comm}% · {n.label}</div></div>;
-                            return<div><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>${n.single.toLocaleString()}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Net {comm}% · {n.label}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>RRP {formatPrice(p.pricing)}</div></div>;
+                            if(n.tiered)return(
+                              <div>
+                                {n.tiered.map((t,i)=>(
+                                  <div key={i} style={{marginBottom:3}}>
+                                    <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{t.label}</div>
+                                    <div style={{display:"flex",gap:8,alignItems:"baseline"}}>
+                                      <span style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>${t.net.toLocaleString()}</span>
+                                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>net · RRP ${t.retail.toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:2}}>{n.label} · {comm}% commission</div>
+                              </div>
+                            );
+                            const grossAmt=(p.pricing.tiers[0]?.retail||0);
+                            const commAmt=Math.round(grossAmt*(comm/100));
+                            return(
+                              <div>
+                                <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.terra}}>${n.single.toLocaleString()} <span style={{fontSize:10,fontWeight:400,color:C.grey400}}>{n.label}</span></div>
+                                <div style={{display:"flex",gap:8,marginTop:3}}>
+                                  <div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>RRP ${grossAmt.toLocaleString()}</div>
+                                  <div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>·</div>
+                                  <div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Comm ${commAmt.toLocaleString()} ({comm}%)</div>
+                                </div>
+                              </div>
+                            );
                           })():(
                             <><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{formatPrice(p.pricing)}</div>{isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}</>
                           )}
@@ -927,7 +1119,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                     {p.description&&<p style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.5,marginBottom:8}}>{p.description}</p>}
                     {item.notes&&<div style={{fontFamily:F.body,fontSize:11,fontStyle:"italic",color:C.navy,background:C.sandLight,borderRadius:5,padding:"6px 10px",marginBottom:8}}>Note: {item.notes}</div>}
                     {showPrice&&isTiered&&p.pricing.tiers?.length>0&&<table style={{borderCollapse:"collapse",marginBottom:8}}><tbody>{p.pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"1px 12px 1px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>}
-                    {p.inclusions?.length>0&&(
+                    {p.inclusions?.length>0&&itinerary.showInclusions!==false&&(
                       <div>
                         <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>Included</div>
                         <ul style={{listStyle:"none",padding:0,columns:2,gap:12}}>
@@ -936,6 +1128,12 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                       </div>
                     )}
                     {showInternal&&p.rezdy&&<div style={{marginTop:6,fontFamily:F.body,fontSize:9,color:C.grey400,background:C.grey100,borderRadius:3,padding:"1px 5px",display:"inline-block"}}>Rezdy: {p.rezdy}</div>}
+                    {p.rezdy&&!showInternal&&(
+                      <a href={`${REZDY_BASE}${p.rezdy}`} target="_blank" rel="noopener noreferrer"
+                        style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,fontFamily:F.body,fontSize:11,fontWeight:600,color:C.terra,textDecoration:"none",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"4px 12px"}}>
+                        Book this experience →
+                      </a>
+                    )}
                   </div>
                 </div>
               );
@@ -945,6 +1143,61 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         );
       })}
 
+      {/* Net rate summary table — trade only */}
+      {isTrade&&(()=>{
+        const allItems=itinerary.days.flatMap(d=>d.items);
+        const seen=new Set();
+        const unique=allItems.filter(item=>{if(seen.has(item.productId))return false;seen.add(item.productId);return true;});
+        if(!unique.length)return null;
+        return(
+          <div className="print-break" style={{marginBottom:20}}>
+            <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>Net Rate Summary · {comm}% Commission</div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:C.navy}}>
+                  {["Experience","Gross (AUD)","Commission","Net rate"].map(h=>(
+                    <th key={h} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.sand,padding:"8px 12px",textAlign:"left",letterSpacing:"0.06em",textTransform:"uppercase"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {unique.map((item,i)=>{
+                  const p=findProduct(allProducts,item.productId);
+                  if(!p)return null;
+                  const tiers=p.pricing.tiers;
+                  const isT=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
+                  const isOR=p.pricing.structure==="on_request"||p.pricing.structure==="component";
+                  return(
+                    <tr key={item.id} style={{background:i%2===0?C.white:C.grey100,borderBottom:`1px solid ${C.grey200}`}}>
+                      <td style={{fontFamily:F.body,fontSize:12,color:C.navy,fontWeight:600,padding:"8px 12px"}}>{p.name}</td>
+                      <td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"8px 12px"}}>
+                        {isOR?"On request":isT?tiers.map(t=>`${t.label}: $${t.retail.toLocaleString()}`).join(" / "):`$${(tiers[0]?.retail||0).toLocaleString()} ${p.pricing.structure==="per_couple"?"per couple":"per adult"}`}
+                      </td>
+                      <td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"8px 12px"}}>
+                        {isOR?"—":isT?tiers.map(t=>`$${Math.round(t.retail*(comm/100)).toLocaleString()}`).join(" / "):`$${Math.round((tiers[0]?.retail||0)*(comm/100)).toLocaleString()}`}
+                      </td>
+                      <td style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.terra,padding:"8px 12px"}}>
+                        {isOR?"POA":isT?tiers.map(t=>`${t.label}: $${Math.round(t.retail*(1-comm/100)).toLocaleString()}`).join(" / "):`$${Math.round((tiers[0]?.retail||0)*(1-comm/100)).toLocaleString()} ${p.pricing.structure==="per_couple"?"per couple":"per adult"}`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div style={{marginTop:8,fontFamily:F.body,fontSize:10,color:C.grey400}}>All rates in AUD inclusive of 10% GST · Net rates based on {comm}% commission on retail</div>
+          </div>
+        );
+      })()}
+
+      {/* Divider before Before You Arrive */}
+      {itinerary.beforeYouArrive&&!isTrade&&(
+        <div className="divider-page no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
+          <div>
+            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
+            <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white}}>Before You Arrive</div>
+          </div>
+        </div>
+      )}
       {/* Before you arrive */}
       {itinerary.beforeYouArrive&&!isTrade&&(
         <div className="print-break" style={{marginBottom:20}}>
@@ -955,6 +1208,15 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         </div>
       )}
 
+      {/* Divider before Terms */}
+      {itinerary.terms&&(
+        <div className="divider-page no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
+          <div>
+            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
+            <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white}}>{isTrade?"Booking Conditions":"Terms & Conditions"}</div>
+          </div>
+        </div>
+      )}
       {/* Terms */}
       {itinerary.terms&&(
         <div className="print-break" style={{marginBottom:20}}>
@@ -977,6 +1239,9 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         </div>
       )}
 
+      {/* Page number — print only */}
+      <div className="no-print" style={{display:"none"}}/>
+      <style>{`@media print{.print-page-num{display:block!important;}.print-break::before{counter-increment:page-num;}.page-num-footer{position:running(footer);}@page{@bottom-center{content:counter(page-num);font-family:Arial,sans-serif;font-size:9pt;color:#9e9b92;}}}`}</style>
       {/* Footer */}
       <div style={{background:C.navy,borderRadius:10,padding:"18px 24px"}}>
         <div style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.sand,marginBottom:10}}>"Unearthing South Australia's captivating Limestone Coast."</div>
@@ -992,7 +1257,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
 }
 
 // ─── Offline HTML generator ───────────────────────────────────────────────────
-function generateOfflineHTML(itinerary, allProducts, productImages) {
+function generateOfflineHTML(itinerary, allProducts, productImages, activeCurrency, fxRates) {
   // Build a self-contained HTML snapshot of the preview
   const fmtD = d => {if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});};
   const fmtDS = d => {if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"});};
@@ -1014,6 +1279,7 @@ function generateOfflineHTML(itinerary, allProducts, productImages) {
       ${itinerary.origin?`<span><b>Origin</b> · ${itinerary.origin}</span>`:""}
     </div>
     ${itinerary.totalPrice?`<div class="price-box"><div class="price-label">Total investment</div><div class="price-val">${itinerary.totalPrice}</div></div>`:""}
+    ${activeCurrency&&activeCurrency!=="AUD"?`<div class="currency-note">Prices shown in AUD · Approximate ${activeCurrency} equivalents shown where available</div>`:""}
     <div class="season-note">Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST${itinerary.ceRef?` &nbsp;·&nbsp; Ref ${itinerary.ceRef}`:""}${itinerary.rezdyRef?` &nbsp;·&nbsp; Rezdy ${itinerary.rezdyRef}`:""}${itinerary.expiryDate?` &nbsp;·&nbsp; <span style="color:#d34727;font-weight:600;">Quote valid until ${fmtD(itinerary.expiryDate)}</span>`:""}</div>
   </div>`;
 
@@ -1123,6 +1389,44 @@ h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957
 </style></head><body>${body}</body></html>`;
 }
 
+// ─── Export CSV ───────────────────────────────────────────────────────────────
+function exportToCSV(itineraries, allProducts) {
+  const rows = [
+    ["CE Ref","Rezdy Ref","Title","Client","Email","Guests","Origin","Arrival","Departure","Status","Total Price","Days","Products","Created","Updated"]
+  ];
+  itineraries.forEach(it=>{
+    const products = it.days.flatMap(d=>d.items).map(item=>{
+      const p=allProducts.find(x=>x.id===item.productId);
+      return p?.name||"";
+    }).filter(Boolean).join(" | ");
+    rows.push([
+      it.ceRef||"",
+      it.rezdyRef||"",
+      it.title||"",
+      it.clientName||"",
+      it.clientEmail||"",
+      it.guestCount||"",
+      it.origin||"",
+      it.arrivalDate||"",
+      it.departureDate||"",
+      it.status||"",
+      it.totalPrice||"",
+      it.days?.length||0,
+      products,
+      it.createdAt?new Date(it.createdAt).toLocaleDateString("en-AU"):"",
+      it.updatedAt?new Date(it.updatedAt).toLocaleDateString("en-AU"):"",
+    ]);
+  });
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv],{type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url;
+  a.download=`CE_Itineraries_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Netlify deploy ───────────────────────────────────────────────────────────
 // Token is stored server-side as NETLIFY_DEPLOY_TOKEN environment variable.
 // The browser calls /.netlify/functions/deploy which proxies to the Netlify API.
@@ -1133,8 +1437,8 @@ async function sha1(str) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
-async function deployToNetlify(itinerary, allProducts, productImages) {
-  const html = generateOfflineHTML(itinerary, allProducts, productImages);
+async function deployToNetlify(itinerary, allProducts, productImages, activeCurrency, fxRates) {
+  const html = generateOfflineHTML(itinerary, allProducts, productImages, activeCurrency, fxRates);
   const fileHash = await sha1(html);
 
   // Call our serverless function — token never touches the browser
@@ -1155,7 +1459,7 @@ async function deployToNetlify(itinerary, allProducts, productImages) {
 }
 
 // ─── Share button component ────────────────────────────────────────────────────
-function ShareButton({itinerary, allProducts, productImages}) {
+function ShareButton({itinerary, allProducts, productImages, activeCurrency, fxRates}) {
   const [state, setState] = useState("idle"); // idle | deploying | done | error
   const [liveUrl, setLiveUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -1163,7 +1467,7 @@ function ShareButton({itinerary, allProducts, productImages}) {
   async function handleDeploy() {
     setState("deploying");
     try {
-      const url = await deployToNetlify(itinerary, allProducts, productImages);
+      const url = await deployToNetlify(itinerary, allProducts, productImages, activeCurrency, fxRates);
       setLiveUrl(url);
       setState("done");
     } catch(e) {
@@ -1206,6 +1510,22 @@ function ShareButton({itinerary, allProducts, productImages}) {
       {state==="deploying"?"Publishing...":state==="error"?"✗ Failed":"🔗 Share link"}
     </button>
   );
+}
+
+// ─── Product usage tracker ────────────────────────────────────────────────────
+function getProductUsage(itineraries, allProducts) {
+  const counts = {};
+  itineraries.forEach(it=>{
+    it.days?.forEach(d=>{
+      d.items?.forEach(item=>{
+        counts[item.productId] = (counts[item.productId]||0) + 1;
+      });
+    });
+  });
+  return allProducts
+    .filter(p=>counts[p.id])
+    .map(p=>({...p, usageCount:counts[p.id]}))
+    .sort((a,b)=>b.usageCount-a.usageCount);
 }
 
 // ─── Email builder ────────────────────────────────────────────────────────────
@@ -1294,13 +1614,13 @@ function buildHtmlEmailBody(itinerary, allProducts) {
   return html;
 }
 
-async function createGmailDraft(itinerary, allProducts, productImages) {
+async function createGmailDraft(itinerary, allProducts, productImages, activeCurrency, fxRates) {
   const subject = `Your Coonawarra Experiences Itinerary — ${itinerary.title}`;
   const to = itinerary.clientEmail || "";
   const plainBody = buildEmailBody(itinerary, allProducts);
 
   // Generate the self-contained HTML itinerary file
-  const htmlItinerary = generateOfflineHTML(itinerary, allProducts, productImages);
+  const htmlItinerary = generateOfflineHTML(itinerary, allProducts, productImages, activeCurrency, fxRates);
   const fileName = `${(itinerary.clientName||"Itinerary").replace(/[^a-z0-9]/gi,"_")}_${itinerary.title.replace(/[^a-z0-9]/gi,"_")}.html`;
   const fileB64 = btoa(unescape(encodeURIComponent(htmlItinerary)));
 
@@ -1353,7 +1673,7 @@ async function createGmailDraft(itinerary, allProducts, productImages) {
 }
 
 // ─── Gmail draft button ───────────────────────────────────────────────────────
-function EmailDraftButton({itinerary,allProducts,productImages}){
+function EmailDraftButton({itinerary,allProducts,productImages,activeCurrency,fxRates}){
   const[state,setState]=useState("idle");
   const[msg,setMsg]=useState("");
   const[connected,setConnected]=useState(()=>!!getStoredToken());
@@ -1361,7 +1681,7 @@ function EmailDraftButton({itinerary,allProducts,productImages}){
   async function handleClick(){
     setState("loading");setMsg("");
     try{
-      await createGmailDraft(itinerary,allProducts,productImages);
+      await createGmailDraft(itinerary,allProducts,productImages,activeCurrency,fxRates);
       setConnected(true);
       setState("success");setMsg("Draft created — itinerary attached");
       setTimeout(()=>setState("idle"),3500);
@@ -1430,6 +1750,19 @@ export default function App(){
   const[dayPicker,setDayPicker]=useState(null); // {product} when open
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
+
+  // Keyboard shortcuts
+  useState(()=>{
+    function handleKey(e){
+      if(e.ctrlKey||e.metaKey){
+        if(e.key==="p"&&active&&bView==="preview"){e.preventDefault();document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}
+        if(e.key==="d"&&active&&bView==="edit"&&editTab==="itinerary"){e.preventDefault();if(active.days.length>0)duplicateDay(active.days[active.days.length-1].id);}
+        if(e.key==="n"){e.preventDefault();createNew();}
+      }
+    }
+    window.addEventListener("keydown",handleKey);
+    return()=>window.removeEventListener("keydown",handleKey);
+  });
   const active=itineraries.find(i=>i.id===activeId)||null;
 
   function handleImagesChange(productId,imgs){const next={...productImages,[productId]:imgs};setPImgs(next);saveImgs(next);}
@@ -1444,6 +1777,13 @@ export default function App(){
   function handleDeleteProduct(id){
     if(!confirm("Delete this custom product?"))return;
     const next=customProducts.filter(p=>p.id!==id);setCPs(next);saveCP(next);
+  }
+
+  function handleDuplicateProduct(product){
+    const copy={...JSON.parse(JSON.stringify(product)),id:uid(),name:product.name+" (copy)"};
+    const next=[copy,...customProducts];
+    setCPs(next);saveCP(next);
+    setLibCat(product.category==="Accommodation"?"Accommodation":"Custom");
   }
 
   // Template operations
@@ -1493,7 +1833,12 @@ export default function App(){
     setIts(next);saveIts(next);
     if(activeId===id)setActiveId(null);
   }
-  function dupIt(it){const c={...JSON.parse(JSON.stringify(it)),id:uid(),title:it.title+" (copy)",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};const next=[c,...itineraries];setIts(next);saveIts(next);setActiveId(c.id);setTab("builder");setBView("edit");}
+  function dupIt(it){
+    const c={...JSON.parse(JSON.stringify(it)),id:uid(),title:it.title+" (copy)",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+    c.ceRef=generateCERef([...itineraries,c]);
+    const next=[c,...itineraries];
+    setIts(next);saveIts(next);setActiveId(c.id);setTab("builder");setBView("edit");
+  }
   function addDay(){mutate(it=>({...it,days:[...it.days,newDay(it.days.length+1)]}));}
   function duplicateDay(dayId){
     mutate(it=>{
@@ -1605,11 +1950,11 @@ export default function App(){
                 ))}
                 <button onClick={()=>setShowFxSettings(v=>!v)} style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.5)",background:"transparent",border:"none",padding:"3px 5px"}} title="Edit exchange rates">⚙</button>
               </div>
-              <ShareButton itinerary={active} allProducts={allProducts} productImages={productImages}/>
+              <ShareButton itinerary={active} allProducts={allProducts} productImages={productImages} activeCurrency={activeCurrency} fxRates={fxRates}/>
               <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
-              <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages}/>
+              <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages} activeCurrency={activeCurrency} fxRates={fxRates}/>
               <button onClick={()=>{
-                const html=generateOfflineHTML(active,allProducts,productImages);
+                const html=generateOfflineHTML(active,allProducts,productImages,activeCurrency,fxRates);
                 const blob=new Blob([html],{type:"text/html"});
                 const url=URL.createObjectURL(blob);
                 const a=document.createElement("a");
@@ -1631,7 +1976,10 @@ export default function App(){
         <div className="no-print" style={{maxWidth:860,margin:"28px auto",padding:"0 18px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
             <div style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>Saved Itineraries</div>
-            <button onClick={createNew} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"7px 14px"}}>+ New</button>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>exportToCSV(itineraries,allProducts)} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"7px 14px"}}>↓ Export CSV</button>
+              <button onClick={createNew} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"7px 14px"}}>+ New</button>
+            </div>
           </div>
           {itineraries.length===0?(
             <div style={{textAlign:"center",padding:"50px 20px",background:C.white,borderRadius:10,border:`1px solid ${C.grey200}`}}>
@@ -1646,10 +1994,13 @@ export default function App(){
                   <span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:SC[it.status],background:`${SC[it.status]}18`,border:`1px solid ${SC[it.status]}30`,borderRadius:10,padding:"1px 6px",textTransform:"uppercase"}}>{SL[it.status]}</span>
                 </div>
                 <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,display:"flex",gap:10,flexWrap:"wrap"}}>
-                  {it.ceRef&&<span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra}}>{it.ceRef}</span>}{it.clientName&&<span>{it.clientName}</span>}
+                  {it.ceRef&&<span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra}}>{it.ceRef}</span>}
+                  {it.followUpDate&&new Date(it.followUpDate)<=new Date()&&<span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.white,background:C.terra,borderRadius:4,padding:"1px 6px"}}>Follow up due</span>}
+                  {it.clientName&&<span>{it.clientName}</span>}
                   <span>{it.days.length} {it.days.length===1?"day":"days"}</span>
                   {it.arrivalDate&&<span>Arrives {fmtDate(it.arrivalDate)}</span>}
                   <span>Updated {new Date(it.updatedAt).toLocaleDateString("en-AU")}</span>
+                  {it.statusHistory?.length>1&&<span style={{color:C.grey400}}>· {it.statusHistory.length} status changes</span>}
                 </div>
               </div>
               <div style={{display:"flex",gap:5,flexShrink:0}}>
@@ -1667,6 +2018,28 @@ export default function App(){
               </div>
             </div>
           ))}
+          {/* Product usage tracker */}
+          {itineraries.length>0&&(()=>{
+            const usage=getProductUsage(itineraries,allProducts).slice(0,8);
+            if(!usage.length)return null;
+            return(
+              <div style={{marginTop:28}}>
+                <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12}}>Most used products</div>
+                <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden"}}>
+                  {usage.map((p,i)=>(
+                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderBottom:i<usage.length-1?`1px solid ${C.grey100}`:"none"}}>
+                      <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra,width:24,textAlign:"center",flexShrink:0}}>{p.usageCount}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.category}</div>
+                      </div>
+                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.usageCount} itinerar{p.usageCount===1?"y":"ies"}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1693,7 +2066,10 @@ export default function App(){
               <div style={{padding:"10px 12px",borderBottom:`1px solid ${C.grey200}`,background:C.grey100}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
                   <div style={{fontFamily:F.heading,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>Product Library</div>
-                  <button onClick={()=>{setShowForm(true);setEditProduct(null);setLibCat("Custom");}} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
+                  <div style={{display:"flex",gap:4}}>
+                    <BulkImageUploader allProducts={allProducts} productImages={productImages} onImagesChange={handleImagesChange}/>
+                    <button onClick={()=>{setShowForm(true);setEditProduct(null);setLibCat("Custom");}} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
+                  </div>
                 </div>
                 <input value={libSearch} onChange={e=>setLibSrch(e.target.value)} placeholder="Search products..." style={{width:"100%",fontFamily:F.body,fontSize:12,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 9px",outline:"none",background:C.white,marginBottom:7}}/>
                 <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
@@ -1728,11 +2104,26 @@ export default function App(){
               <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"8px 14px"}}>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
                   <input value={active.title} onChange={e=>mutate(it=>({...it,title:e.target.value}))} style={{fontFamily:F.heading,fontSize:15,fontWeight:700,color:C.navy,border:"none",outline:"none",background:"transparent",flex:"1 1 180px",minWidth:0}} placeholder="Itinerary title"/>
-                  <input value={active.clientName} onChange={e=>mutate(it=>({...it,clientName:e.target.value}))} placeholder="Client name" style={{...fi,width:140}}/>
+                  <div style={{position:"relative"}}>
+                    <input value={active.clientName} onChange={e=>{
+                      mutate(it=>({...it,clientName:e.target.value}));
+                    }} placeholder="Client name" style={{...fi,width:140}}
+                    list="past-clients"/>
+                    <datalist id="past-clients">
+                      {[...new Set(itineraries.filter(i=>i.id!==activeId&&i.clientName).map(i=>i.clientName))].map(name=>(
+                        <option key={name} value={name}/>
+                      ))}
+                    </datalist>
+                  </div>
                   <input value={active.clientEmail} onChange={e=>mutate(it=>({...it,clientEmail:e.target.value}))} placeholder="Client email" style={{...fi,width:180}}/>
                   <input type="number" value={active.guestCount} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||2}))} min={1} max={20} title="Guests" style={{...fi,width:55}}/>
                   <input value={active.origin} onChange={e=>mutate(it=>({...it,origin:e.target.value}))} placeholder="Origin" style={{...fi,width:110}}/>
-                  <select value={active.status} onChange={e=>mutate(it=>({...it,status:e.target.value}))} style={{...fi,color:SC[active.status],fontWeight:600}}>
+                  <select value={active.status} onChange={e=>{
+                    const newStatus=e.target.value;
+                    mutate(it=>({...it,status:newStatus,
+                      statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
+                    }));
+                  }} style={{...fi,color:SC[active.status],fontWeight:600}}>
                     <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
                   </select>
                   <div style={{display:"flex",alignItems:"center",gap:4,background:C.sandLight,borderRadius:5,padding:"3px 8px",flexShrink:0}}>
@@ -1756,6 +2147,22 @@ export default function App(){
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Quote valid until</span>
                     <input type="date" value={active.expiryDate||""} onChange={e=>mutate(it=>({...it,expiryDate:e.target.value}))} style={{...fi}}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Follow up</span>
+                    <input type="date" value={active.followUpDate||""} onChange={e=>mutate(it=>({...it,followUpDate:e.target.value}))} style={{...fi,borderColor:active.followUpDate&&new Date(active.followUpDate)<=new Date()?C.terra:C.grey200}}/>
+                  </div>
+                  {active.tradeMode&&(
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Book by</span>
+                      <input type="date" value={active.bookByDate||""} onChange={e=>mutate(it=>({...it,bookByDate:e.target.value}))} style={{...fi,borderColor:C.terra}}/>
+                    </div>
+                  )}
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show inclusions</span>
+                    <div onClick={()=>mutate(it=>({...it,showInclusions:it.showInclusions===false?true:false}))} style={{width:32,height:17,borderRadius:9,background:active.showInclusions===false?C.grey200:C.teal,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                      <div style={{position:"absolute",top:2,left:active.showInclusions===false?2:14,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                    </div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
                     <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show item pricing</span>
@@ -1834,6 +2241,31 @@ export default function App(){
                 {/* Content tab */}
                 {editTab==="content"&&(
                   <>
+                    {active.tradeMode&&(
+                      <SectionBox title="Trade Partner Details" accent={C.terra}>
+                        <div style={{display:"flex",gap:8,marginBottom:10}}>
+                          <div style={{flex:2}}>
+                            <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agency / partner name</label>
+                            <input value={active.agentName||""} onChange={e=>mutate(it=>({...it,agentName:e.target.value}))} placeholder="e.g. Nyhavn Rejser" style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none"}}/>
+                          </div>
+                          <div style={{flex:1}}>
+                            <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agent ref / file no.</label>
+                            <input value={active.agentRef||""} onChange={e=>mutate(it=>({...it,agentRef:e.target.value}))} placeholder="e.g. NYH-2027-042" style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none"}}/>
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agent logo (appears on trade cover)</label>
+                          {active.agentLogo?(
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                              <img src={active.agentLogo} alt="Agent logo" style={{height:40,maxWidth:160,objectFit:"contain",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:4,padding:4}}/>
+                              <button onClick={()=>mutate(it=>({...it,agentLogo:""}))} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}30`,borderRadius:4,padding:"3px 10px"}}>Remove</button>
+                            </div>
+                          ):(
+                            <AgentLogoUploader onUpload={url=>mutate(it=>({...it,agentLogo:url}))}/>
+                          )}
+                        </div>
+                      </SectionBox>
+                    )}
                     <SectionBox title="Cover Hero Image (optional)">
                       <div style={{marginBottom:8}}>
                         {active.coverImage?(
@@ -1846,6 +2278,10 @@ export default function App(){
                         )}
                         <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>Appears as a full-bleed background behind the navy cover. Use a landscape landscape photo — vineyard, coastline, wildlife.</div>
                       </div>
+                    </SectionBox>
+                    <SectionBox title="Welcome Message (appears on cover)">
+                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>A personal note on the cover page, below the client name. Set in italic serif. Leave blank to hide.</div>
+                      <textarea value={active.welcomeMessage||""} onChange={e=>mutate(it=>({...it,welcomeMessage:e.target.value}))} placeholder={`We're delighted to have put together this journey for you — a few days of wine, wilderness and warm Limestone Coast hospitality.\n\nWe look forward to welcoming you in person.`} style={{width:"100%",fontFamily:F.serif,fontStyle:"italic",fontSize:13,color:C.navy,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
                     </SectionBox>
                     <SectionBox title="Introduction / Journey Overview">
                       <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for the itinerary — what makes this journey special, the tone you want to set. Appears between the cover and Day 1." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:90,outline:"none"}}/>
@@ -1862,6 +2298,9 @@ export default function App(){
                     <SectionBox title="Email Introduction">
                       <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>Opening paragraph for the Gmail draft email — personal note before the itinerary summary. Leave blank for the default.</div>
                       <textarea value={active.emailIntro||""} onChange={e=>mutate(it=>({...it,emailIntro:e.target.value}))} placeholder={`Hi ${active.clientName||"[name]"},\n\nThank you for your interest in a private journey with us. I've put together the following itinerary based on what we discussed...`} style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Internal Notes (never shown to client or agent)">
+                      <textarea value={active.internalNotes||""} onChange={e=>mutate(it=>({...it,internalNotes:e.target.value}))} placeholder="Operational reminders, supplier contacts, logistics, follow-up notes..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.terra,border:`1px solid ${C.terra}30`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none",background:"#fff8f6"}}/>
                     </SectionBox>
                     <SectionBox title="Footer Note (optional)">
                       <textarea value={active.notes||""} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Any additional note to appear in the itinerary footer..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:48,outline:"none"}}/>
