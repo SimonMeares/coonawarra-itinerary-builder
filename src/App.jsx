@@ -180,6 +180,7 @@ function newItinerary(){
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const CL_CLOUD="dgzv5n4f3";
+const LOGO_URL="https://res.cloudinary.com/dgzv5n4f3/image/upload/f_auto,q_auto,w_300/Coonawarra-Experiences-Logo-Portrait-Reverse-Transparent-300dpi-RGB_olm9ho.png";
 const CL_PRESET="ce_unsigned";
 
 async function uploadToCloudinary(file){
@@ -699,7 +700,7 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
       {/* Cover */}
       <div style={{background:C.navy,borderRadius:10,padding:"28px 32px",marginBottom:16,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:C.teal,opacity:0.1,borderRadius:"0 0 0 100%"}}/>
-        <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:6}}>Coonawarra Experiences</div>
+        <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:90,width:"auto",marginBottom:10,display:"block"}} crossOrigin="anonymous"/>
         <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white,lineHeight:1.1,marginBottom:6}}>{itinerary.title||"Private Itinerary"}</div>
         {isTrade&&<div style={{display:"inline-block",background:C.terra,borderRadius:5,padding:"2px 10px",marginBottom:10,fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,letterSpacing:"0.1em",textTransform:"uppercase"}}>Trade Partner Rate Sheet · {comm}% Commission</div>}
         {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.sand,marginBottom:14}}>{isTrade?"Prepared for trade partner:":"Prepared for"} {itinerary.clientName}</div>}
@@ -874,7 +875,7 @@ function generateOfflineHTML(itinerary, allProducts, productImages) {
 
   // Cover
   body += `<div class="cover">
-    <div class="cover-label">Coonawarra Experiences</div>
+    <img src="https://res.cloudinary.com/dgzv5n4f3/image/upload/f_auto,q_auto,w_300/Coonawarra-Experiences-Logo-Portrait-Reverse-Transparent-300dpi-RGB_olm9ho.png" alt="Coonawarra Experiences" style="height:90px;width:auto;display:block;margin-bottom:10px;">
     <h1>${itinerary.title||"Private Itinerary"}</h1>
     ${itinerary.clientName?`<p class="serif italic sand">Prepared for ${itinerary.clientName}</p>`:""}
     <div class="cover-meta">
