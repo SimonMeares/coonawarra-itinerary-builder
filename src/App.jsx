@@ -159,19 +159,31 @@ function tagIcon(tag){
   return map[tag]||"✦";
 }
 
+function generateCERef(existingItineraries) {
+  const year = new Date().getFullYear();
+  const season = new Date().getMonth() >= 3 ? year + 1 : year; // April onwards = next season
+  const prefix = `CE-${season}-`;
+  const existing = (existingItineraries||[])
+    .map(it => it.ceRef||"")
+    .filter(r => r.startsWith(prefix))
+    .map(r => parseInt(r.replace(prefix,""))||0);
+  const next = existing.length ? Math.max(...existing) + 1 : 1;
+  return `${prefix}${String(next).padStart(3,"0")}`;
+}
+
 function newDay(index){
   return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:""};
 }
 
 function newItinerary(){
   return{
-    id:uid(),title:"New Itinerary",clientName:"",clientEmail:"",
+    id:uid(),ceRef:"",rezdyRef:"",title:"New Itinerary",clientName:"",clientEmail:"",
     guestCount:2,arrivalDate:"",departureDate:"",origin:"Melbourne",
     status:"draft",totalPrice:"",showPricing:false,tradeMode:false,commission:20,
     intro:"",hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they've built with the region's people, places and producers.",
-    beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
+    emailIntro:"",beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
     terms:DEFAULT_TERMS,notes:"",
-    attachments:[],
+    coverImage:"",attachments:[],
     guestInfo:{name1:"",name2:"",email:"",phone:"",country:"",dietary:"",medical:"",celebrating:"",notes:""},
     days:[newDay(1)],
     createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
@@ -192,6 +204,21 @@ async function uploadToCloudinary(file){
   if(!res.ok)throw new Error("Upload failed");
   const data=await res.json();
   return data.secure_url.replace("/upload/","/upload/f_auto,q_auto,w_1400/");
+}
+
+// ─── Exchange rates ───────────────────────────────────────────────────────────
+const DEFAULT_FX = {NZD:1.08,GBP:0.51,USD:0.64,SGD:0.87,EUR:0.59};
+const FX_KEY = "ce_fx_rates";
+function loadFX(){try{const r=localStorage.getItem(FX_KEY);return r?JSON.parse(r):DEFAULT_FX;}catch(e){return DEFAULT_FX;}}
+function saveFX(r){try{localStorage.setItem(FX_KEY,JSON.stringify(r));}catch(e){}}
+
+function convertPrice(audAmount, currency, rates){
+  if(!audAmount||currency==="AUD") return null;
+  const rate = rates[currency];
+  if(!rate) return null;
+  const converted = Math.round(audAmount * rate);
+  const symbols = {NZD:"NZ$",GBP:"£",USD:"US$",SGD:"S$",EUR:"€"};
+  return `${symbols[currency]||currency}${converted.toLocaleString()}`;
 }
 
 // ─── Gmail OAuth ──────────────────────────────────────────────────────────────
@@ -298,6 +325,29 @@ function Badge({color,children,xs}){
 function TierTable({pricing}){
   if(!["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(pricing.structure)||!pricing.tiers?.length)return null;
   return<table style={{width:"100%",borderCollapse:"collapse",marginTop:4}}><tbody>{pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"2px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,textAlign:"right",fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>;
+}
+
+// ─── Cover image uploader ─────────────────────────────────────────────────────
+function CoverImageUploader({onUpload}){
+  const inputRef=useRef();
+  const[uploading,setUploading]=useState(false);
+  const[error,setError]=useState(null);
+  async function handleFile(file){
+    if(!file||!file.type.startsWith("image/"))return;
+    setUploading(true);setError(null);
+    try{const url=await uploadToCloudinary(file);onUpload(url);}
+    catch(e){setError("Upload failed — try again.");}
+    finally{setUploading(false);}
+  }
+  return(
+    <div className="pdf-drop" onClick={()=>!uploading&&inputRef.current.click()} style={{marginBottom:6,textAlign:"center",padding:"14px"}}>
+      <div style={{fontFamily:F.body,fontSize:11,color:uploading?C.teal:C.grey400}}>
+        {uploading?<>⏳ Uploading...</>:<>🖼 Click to upload cover image</>}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+      {error&&<div style={{color:C.terra,fontSize:10,marginTop:3}}>{error}</div>}
+    </div>
+  );
 }
 
 // ─── Section box ──────────────────────────────────────────────────────────────
@@ -690,7 +740,7 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
 }
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
-function Preview({itinerary,productImages,showInternal,allProducts}){
+function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRates}){
   const isTrade=itinerary.tradeMode||false;
   const comm=itinerary.commission||20;
   const highlights=buildHighlights(itinerary,allProducts);
@@ -699,6 +749,7 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
     <div style={{fontFamily:F.body,color:C.text,maxWidth:860,margin:"0 auto"}}>
       {/* Cover */}
       <div style={{background:C.navy,borderRadius:10,padding:"28px 32px",marginBottom:16,position:"relative",overflow:"hidden"}}>
+        {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",opacity:0.18,display:"block"}} crossOrigin="anonymous"/>}
         <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:C.teal,opacity:0.1,borderRadius:"0 0 0 100%"}}/>
         <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:90,width:"auto",marginBottom:10,display:"block"}} crossOrigin="anonymous"/>
         <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white,lineHeight:1.1,marginBottom:6}}>{itinerary.title||"Private Itinerary"}</div>
@@ -715,6 +766,14 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
           <div style={{display:"inline-block",background:"rgba(255,255,255,0.1)",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:14}}>
             <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{isTrade?"Total (net rates)":"Total investment"}</div>
             <div style={{fontFamily:F.heading,fontSize:20,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
+            {currency&&currency!=="AUD"&&itinerary.totalPrice&&(()=>{
+              const num=parseFloat((itinerary.totalPrice||"").replace(/[^0-9.]/g,""));
+              if(!num||!fxRates) return null;
+              const rate=fxRates[currency];
+              const symbols={NZD:"NZ$",GBP:"£",USD:"US$",SGD:"S$",EUR:"€"};
+              if(!rate) return null;
+              return<div style={{fontFamily:F.body,fontSize:11,color:C.sand,marginTop:2}}>approx. {symbols[currency]}{Math.round(num*rate).toLocaleString()} {currency}</div>;
+            })()}
           </div>
         )}
         {highlights.length>0&&(
@@ -727,7 +786,13 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
             ))}
           </div>
         )}
-        <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid rgba(255,255,255,0.1)`,fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.35)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+        <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid rgba(255,255,255,0.1)`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+          <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.35)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+          <div style={{display:"flex",gap:12}}>
+            {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.5)"}}><span style={{color:C.sand}}>Ref</span> {itinerary.ceRef}</div>}
+            {itinerary.rezdyRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.5)"}}><span style={{color:C.sand}}>Rezdy</span> {itinerary.rezdyRef}</div>}
+          </div>
+        </div>
       </div>
 
       {/* Intro */}
@@ -792,11 +857,12 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
                         </div>
                       )}
                     </div>
-                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
-                      <Badge color={typeColor(p.type)} xs>{p.type==="small_group"?"Small Group":p.type==="component"?"Component":"Private"}</Badge>
-                      {p.duration&&<Badge xs>{p.duration}</Badge>}
-                      {p.departures&&<Badge xs>{p.departures}</Badge>}
-                    </div>
+                    {(p.duration||p.departures)&&(
+                      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                        {p.duration&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.duration}</span>}
+                        {p.departures&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.departures}</span>}
+                      </div>
+                    )}
                     {p.description&&<p style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.5,marginBottom:8}}>{p.description}</p>}
                     {item.notes&&<div style={{fontFamily:F.body,fontSize:11,fontStyle:"italic",color:C.navy,background:C.sandLight,borderRadius:5,padding:"6px 10px",marginBottom:8}}>Note: {item.notes}</div>}
                     {showPrice&&isTiered&&p.pricing.tiers?.length>0&&<table style={{borderCollapse:"collapse",marginBottom:8}}><tbody>{p.pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"1px 12px 1px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>}
@@ -852,7 +918,7 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
 
       {/* Footer */}
       <div style={{background:C.navy,borderRadius:10,padding:"18px 24px"}}>
-        <div style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.sand,marginBottom:10}}>"Hosted journeys of wine country and beyond."</div>
+        <div style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.sand,marginBottom:10}}>"Unearthing South Australia's captivating Limestone Coast."</div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
           {[["Phone","1800 861 190"],["Email","info@coonawarraexperiences.com.au"],["Web","coonawarraexperiences.com.au"]].map(([k,v])=>(
             <div key={k} style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.6)"}}><span style={{color:C.sand,fontWeight:600}}>{k}</span> {v}</div>
@@ -874,7 +940,8 @@ function generateOfflineHTML(itinerary, allProducts, productImages) {
   let body = "";
 
   // Cover
-  body += `<div class="cover">
+  if(itinerary.coverImage) body += `<div class="cover" style="position:relative;overflow:hidden"><img src="${itinerary.coverImage}" alt="" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0.18;">`; body += `<div class="cover">`;
+  body += `
     <img src="https://res.cloudinary.com/dgzv5n4f3/image/upload/f_auto,q_auto,w_300/Coonawarra-Experiences-Logo-Portrait-Reverse-Transparent-300dpi-RGB_olm9ho.png" alt="Coonawarra Experiences" style="height:90px;width:auto;display:block;margin-bottom:10px;">
     <h1>${itinerary.title||"Private Itinerary"}</h1>
     ${itinerary.clientName?`<p class="serif italic sand">Prepared for ${itinerary.clientName}</p>`:""}
@@ -886,7 +953,7 @@ function generateOfflineHTML(itinerary, allProducts, productImages) {
       ${itinerary.origin?`<span><b>Origin</b> · ${itinerary.origin}</span>`:""}
     </div>
     ${itinerary.totalPrice?`<div class="price-box"><div class="price-label">Total investment</div><div class="price-val">${itinerary.totalPrice}</div></div>`:""}
-    <div class="season-note">Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+    <div class="season-note">Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST${itinerary.ceRef?` &nbsp;·&nbsp; Ref ${itinerary.ceRef}`:""}${itinerary.rezdyRef?` &nbsp;·&nbsp; Rezdy ${itinerary.rezdyRef}`:""}</div>
   </div>`;
 
   // Intro
@@ -933,7 +1000,7 @@ function generateOfflineHTML(itinerary, allProducts, productImages) {
   }
 
   // Footer
-  body += `<div class="footer"><p class="serif italic">"Hosted journeys of wine country and beyond."</p><div class="footer-contacts"><span><b>Phone</b> 1800 861 190</span><span><b>Email</b> info@coonawarraexperiences.com.au</span><span><b>Web</b> coonawarraexperiences.com.au</span></div></div>`;
+  body += `<div class="footer"><p class="serif italic">"Unearthing South Australia's captivating Limestone Coast."</p><div class="footer-contacts"><span><b>Phone</b> 1800 861 190</span><span><b>Email</b> info@coonawarraexperiences.com.au</span><span><b>Web</b> coonawarraexperiences.com.au</span></div></div>`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${itinerary.title||"Itinerary"} — ${itinerary.clientName||"Coonawarra Experiences"}</title>
 <style>
@@ -1028,7 +1095,11 @@ function buildHtmlEmailBody(itinerary, allProducts) {
 
   // Opening
   html+=`<p style="margin-bottom:16px;">Dear ${itinerary.clientName||"there"},</p>`;
-  html+=`<p style="margin-bottom:16px;">Thank you for your interest in a private journey with Coonawarra Experiences. Please find your itinerary below.</p>`;
+  if(itinerary.emailIntro){
+    html+=`<p style="margin-bottom:16px;white-space:pre-wrap;">${itinerary.emailIntro}</p>`;
+  } else {
+    html+=`<p style="margin-bottom:16px;">Thank you for your interest in a private journey with Coonawarra Experiences. Please find your itinerary attached.</p>`;
+  }
 
   if(itinerary.intro){html+=`<p style="margin-bottom:16px;font-style:italic;color:${grey};">${itinerary.intro}</p>`;}
 
@@ -1207,6 +1278,9 @@ export default function App(){
   const[editProduct,setEditProduct]=useState(null);
   const[showTemplateManager,setShowTM]=useState(false);
   const[showSaveTemplate,setShowST]=useState(false);
+  const[fxRates,setFxRates]=useState(()=>loadFX());
+  const[activeCurrency,setActiveCurrency]=useState("AUD");
+  const[showFxSettings,setShowFxSettings]=useState(false);
   const[dayPicker,setDayPicker]=useState(null); // {product} when open
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
@@ -1258,7 +1332,12 @@ export default function App(){
 
   function mutate(fn){setIts(prev=>{const next=prev.map(i=>i.id===activeId?{...fn(i),updatedAt:new Date().toISOString()}:i);saveIts(next);return next;});}
 
-  function createNew(){const it=newItinerary();const next=[it,...itineraries];setIts(next);saveIts(next);setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");}
+  function createNew(){
+    const it=newItinerary();
+    it.ceRef=generateCERef(itineraries);
+    const next=[it,...itineraries];
+    setIts(next);saveIts(next);setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");
+  }
   function deleteIt(id){if(!confirm("Delete this itinerary?"))return;const next=itineraries.filter(i=>i.id!==id);setIts(next);saveIts(next);if(activeId===id)setActiveId(null);}
   function dupIt(it){const c={...JSON.parse(JSON.stringify(it)),id:uid(),title:it.title+" (copy)",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};const next=[c,...itineraries];setIts(next);saveIts(next);setActiveId(c.id);setTab("builder");setBView("edit");}
   function addDay(){mutate(it=>({...it,days:[...it.days,newDay(it.days.length+1)]}));}
@@ -1293,6 +1372,26 @@ export default function App(){
       {/* Modals */}
       {showTemplateManager&&<TemplateManager templates={templates} onLoad={handleLoadTemplate} onDelete={handleDeleteTemplate} onClose={()=>setShowTM(false)}/>}
       {showSaveTemplate&&active&&<SaveTemplateModal itinerary={active} onSave={handleSaveTemplate} onClose={()=>setShowST(false)}/>}
+      {showFxSettings&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowFxSettings(false)}>
+          <div style={{background:C.white,borderRadius:10,padding:22,width:340,boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:4}}>Exchange Rates</div>
+            <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:14}}>Set your fixed rates against AUD. Update these seasonally.</div>
+            {Object.entries(fxRates).map(([currency,rate])=>(
+              <div key={currency} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <span style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.navy,width:36}}>{currency}</span>
+                <span style={{fontFamily:F.body,fontSize:11,color:C.grey400,flex:1}}>1 AUD =</span>
+                <input type="number" step="0.01" value={rate} onChange={e=>{const next={...fxRates,[currency]:parseFloat(e.target.value)||0};setFxRates(next);saveFX(next);}} style={{fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",outline:"none",width:80,textAlign:"right"}}/>
+                <span style={{fontFamily:F.body,fontSize:11,color:C.grey400,width:30}}>{currency}</span>
+              </div>
+            ))}
+            <div style={{marginTop:12,display:"flex",gap:8}}>
+              <button onClick={()=>{setFxRates(DEFAULT_FX);saveFX(DEFAULT_FX);}} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:C.grey100,border:"none",borderRadius:5,padding:"6px 12px"}}>Reset defaults</button>
+              <button onClick={()=>setShowFxSettings(false)} style={{flex:1,fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"6px 12px"}}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
       {dayPicker&&active&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDayPicker(null)}>
           <div style={{background:C.white,borderRadius:10,padding:20,minWidth:300,boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
@@ -1346,6 +1445,12 @@ export default function App(){
           <button onClick={createNew} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"6px 12px"}}>+ New</button>
           {tab==="builder"&&active&&bView==="preview"&&(
             <>
+              <div style={{display:"flex",alignItems:"center",gap:3}}>
+                {["AUD","NZD","GBP","USD","SGD","EUR"].map(c=>(
+                  <button key={c} onClick={()=>setActiveCurrency(c)} style={{fontFamily:F.body,fontSize:10,fontWeight:activeCurrency===c?700:400,color:activeCurrency===c?C.navy:"rgba(255,255,255,0.6)",background:activeCurrency===c?C.sand:"transparent",border:activeCurrency===c?"none":`1px solid rgba(255,255,255,0.2)`,borderRadius:4,padding:"3px 7px"}}>{c}</button>
+                ))}
+                <button onClick={()=>setShowFxSettings(v=>!v)} style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.5)",background:"transparent",border:"none",padding:"3px 5px"}} title="Edit exchange rates">⚙</button>
+              </div>
               <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
               <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages}/>
               <button onClick={()=>{
@@ -1386,7 +1491,7 @@ export default function App(){
                   <span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:SC[it.status],background:`${SC[it.status]}18`,border:`1px solid ${SC[it.status]}30`,borderRadius:10,padding:"1px 6px",textTransform:"uppercase"}}>{SL[it.status]}</span>
                 </div>
                 <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,display:"flex",gap:10,flexWrap:"wrap"}}>
-                  {it.clientName&&<span>{it.clientName}</span>}
+                  {it.ceRef&&<span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra}}>{it.ceRef}</span>}{it.clientName&&<span>{it.clientName}</span>}
                   <span>{it.days.length} {it.days.length===1?"day":"days"}</span>
                   {it.arrivalDate&&<span>Arrives {fmtDate(it.arrivalDate)}</span>}
                   <span>Updated {new Date(it.updatedAt).toLocaleDateString("en-AU")}</span>
@@ -1416,7 +1521,7 @@ export default function App(){
           </div>
         ):bView==="preview"?(
           <div style={{padding:"20px 18px"}}>
-            <Preview itinerary={active} productImages={productImages} showInternal={showInternal} allProducts={allProducts}/>
+            <Preview itinerary={active} productImages={productImages} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
           </div>
         ):(
           <div className="no-print" style={{display:"grid",gridTemplateColumns:"300px 1fr",height:"calc(100vh - 84px)",overflow:"hidden"}}>
@@ -1466,6 +1571,10 @@ export default function App(){
                   <select value={active.status} onChange={e=>mutate(it=>({...it,status:e.target.value}))} style={{...fi,color:SC[active.status],fontWeight:600}}>
                     <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
                   </select>
+                  <div style={{display:"flex",alignItems:"center",gap:4,background:C.sandLight,borderRadius:5,padding:"3px 8px",flexShrink:0}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em"}}>{active.ceRef||"—"}</span>
+                  </div>
+                  <input value={active.rezdyRef||""} onChange={e=>mutate(it=>({...it,rezdyRef:e.target.value}))} placeholder="Rezdy ref..." style={{...fi,width:100}} title="Rezdy booking reference"/>
                 </div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -1548,6 +1657,19 @@ export default function App(){
                 {/* Content tab */}
                 {editTab==="content"&&(
                   <>
+                    <SectionBox title="Cover Hero Image (optional)">
+                      <div style={{marginBottom:8}}>
+                        {active.coverImage?(
+                          <div style={{position:"relative",marginBottom:8}}>
+                            <img src={active.coverImage} alt="Cover" style={{width:"100%",height:100,objectFit:"cover",borderRadius:6,display:"block"}} crossOrigin="anonymous"/>
+                            <button onClick={()=>mutate(it=>({...it,coverImage:""}))} style={{position:"absolute",top:4,right:4,background:C.terra,color:C.white,border:"none",borderRadius:4,padding:"2px 8px",fontFamily:F.body,fontSize:10,cursor:"pointer"}}>Remove</button>
+                          </div>
+                        ):(
+                          <CoverImageUploader onUpload={url=>mutate(it=>({...it,coverImage:url}))}/>
+                        )}
+                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>Appears as a full-bleed background behind the navy cover. Use a landscape landscape photo — vineyard, coastline, wildlife.</div>
+                      </div>
+                    </SectionBox>
                     <SectionBox title="Introduction / Journey Overview">
                       <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for the itinerary — what makes this journey special, the tone you want to set. Appears between the cover and Day 1." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:90,outline:"none"}}/>
                     </SectionBox>
@@ -1559,6 +1681,10 @@ export default function App(){
                     </SectionBox>
                     <SectionBox title="Terms & Conditions">
                       <textarea value={active.terms||""} onChange={e=>mutate(it=>({...it,terms:e.target.value}))} placeholder="Terms and conditions. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Email Introduction">
+                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>Opening paragraph for the Gmail draft email — personal note before the itinerary summary. Leave blank for the default.</div>
+                      <textarea value={active.emailIntro||""} onChange={e=>mutate(it=>({...it,emailIntro:e.target.value}))} placeholder={`Hi ${active.clientName||"[name]"},\n\nThank you for your interest in a private journey with us. I've put together the following itinerary based on what we discussed...`} style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
                     </SectionBox>
                     <SectionBox title="Footer Note (optional)">
                       <textarea value={active.notes||""} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Any additional note to appear in the itinerary footer..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:48,outline:"none"}}/>
