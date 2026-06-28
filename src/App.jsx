@@ -1140,11 +1140,18 @@ function ShareButton({itinerary, allProducts, productImages}) {
 
   if (state==="done") return (
     <div style={{display:"flex",alignItems:"center",gap:4}}>
-      <div style={{fontFamily:F.body,fontSize:10,color:C.white,background:"rgba(255,255,255,0.15)",borderRadius:5,padding:"5px 10px",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>https://ce-limestonecoast.netlify.app</div>
+      <div style={{display:"flex",flexDirection:"column",gap:1}}>
+        <div style={{fontFamily:F.body,fontSize:10,color:C.white,background:"rgba(255,255,255,0.15)",borderRadius:5,padding:"4px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          ce-limestonecoast.netlify.app
+        </div>
+        <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.45)",paddingLeft:2}}>
+          Live: {itinerary.ceRef||"—"}{itinerary.clientName?` · ${itinerary.clientName}`:""}
+        </div>
+      </div>
       <button onClick={handleCopy} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 10px"}}>
         {copied?"✓ Copied":"Copy link"}
       </button>
-      <button onClick={handleDeploy} style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.6)",background:"transparent",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:5,padding:"5px 8px"}}>↺</button>
+      <button onClick={handleDeploy} title="Redeploy" style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.6)",background:"transparent",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:5,padding:"5px 8px"}}>↺</button>
     </div>
   );
 
@@ -1411,7 +1418,8 @@ export default function App(){
   }
 
   function handleDeleteTemplate(id){
-    if(!confirm("Delete this template?"))return;
+    const tmpl=templates.find(t=>t.id===id);
+    if(!confirm(`Delete template "${tmpl?.name||"this template"}"?\n\nThis cannot be undone.`))return;
     const next=templates.filter(t=>t.id!==id);setTemplates(next);saveTemplates(next);
   }
 
@@ -1435,7 +1443,14 @@ export default function App(){
     const next=[it,...itineraries];
     setIts(next);saveIts(next);setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");
   }
-  function deleteIt(id){if(!confirm("Delete this itinerary?"))return;const next=itineraries.filter(i=>i.id!==id);setIts(next);saveIts(next);if(activeId===id)setActiveId(null);}
+  function deleteIt(id){
+    const it=itineraries.find(i=>i.id===id);
+    const name=it?.clientName?`${it.title} — ${it.clientName}`:it?.title||"this itinerary";
+    if(!confirm(`Delete "${name}"?\n\nThis cannot be undone.`))return;
+    const next=itineraries.filter(i=>i.id!==id);
+    setIts(next);saveIts(next);
+    if(activeId===id)setActiveId(null);
+  }
   function dupIt(it){const c={...JSON.parse(JSON.stringify(it)),id:uid(),title:it.title+" (copy)",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};const next=[c,...itineraries];setIts(next);saveIts(next);setActiveId(c.id);setTab("builder");setBView("edit");}
   function addDay(){mutate(it=>({...it,days:[...it.days,newDay(it.days.length+1)]}));}
   function duplicateDay(dayId){
@@ -1596,7 +1611,15 @@ export default function App(){
                 </div>
               </div>
               <div style={{display:"flex",gap:5,flexShrink:0}}>
-                <button onClick={()=>{setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");}} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"5px 12px"}}>Open</button>
+                <button onClick={()=>{
+                  // Backfill CE ref if missing
+                  if(!it.ceRef){
+                    const ref=generateCERef(itineraries.filter(i=>i.id!==it.id));
+                    const next=itineraries.map(i=>i.id===it.id?{...i,ceRef:ref}:i);
+                    setIts(next);saveIts(next);
+                  }
+                  setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");
+                }} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"5px 12px"}}>Open</button>
                 <button onClick={()=>dupIt(it)} style={{fontFamily:F.body,fontSize:11,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 10px"}}>Copy</button>
                 <button onClick={()=>deleteIt(it.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"5px 10px"}}>Delete</button>
               </div>
