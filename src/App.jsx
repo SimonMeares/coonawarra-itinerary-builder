@@ -278,7 +278,7 @@ function ImageUploader({productId,images,onImagesChange}){
 function ImageStrip({images}){
   if(!images?.length)return null;
   const show=images.slice(0,4);
-  return<div style={{display:"grid",gridTemplateColumns:`repeat(${show.length},1fr)`,gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>{show.map((src,i)=><img key={i} src={src} alt="" style={{width:"100%",height:show.length===1?160:90,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>)}</div>;
+  return<div style={{display:"grid",gridTemplateColumns:`repeat(${show.length},1fr)`,gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>{show.map((src,i)=><img key={i} src={src} alt="" style={{width:"100%",height:show.length===1?260:100,objectFit:"cover",objectPosition:"center center",display:"block"}} crossOrigin="anonymous"/>)}</div>;
 }
 
 // ─── PDF attachment manager ───────────────────────────────────────────────────
