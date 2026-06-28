@@ -1574,7 +1574,7 @@ function FlightLookup() {
       const code = flightNum.trim().toUpperCase().replace(/\s+/g, "");
       // AeroDataBox via RapidAPI — works over HTTPS in the browser
       const today = new Date().toISOString().slice(0, 10);
-      const url = `https://aerodatabox.p.rapidapi.com/flights/iata/${code}`;
+      const url = `https://aerodatabox.p.rapidapi.com/flights/iata/${code}/${today}`;
       const res = await fetch(url, {
         method: "GET",
         headers: {
