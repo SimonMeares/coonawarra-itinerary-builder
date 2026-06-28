@@ -88,8 +88,8 @@ const BUILT_IN_PRODUCTS = [
   {id:"p-confido",rezdy:null,category:"Experience Components",name:"Confido Olive Oil",subtitle:"Boutique olive grove tasting · Coonawarra",type:"component",duration:null,departures:null,location:"Coonawarra",minGuests:null,maxGuests:null,pricing:{structure:"component",tiers:[],note:"Included in select tours and packages"},tags:["Olive Oil","Produce","Artisan"],description:"A boutique olive oil experience with the makers at Confido — freshly pressed extra virgin olive oil, tasted straight from the grove.",inclusions:["Hosted olive oil tasting with the producers","Freshly pressed extra virgin olive oil"]},
 ];
 
-const CATS=["All","Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Custom"];
-const CAT_S={"All":"All","Day Tours":"Day Tours","Stay & Tour Packages":"Packages","Transfers & Journeys":"Transfers","Experience Components":"Components","Custom":"Custom"};
+const CATS=["All","Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Accommodation","Custom"];
+const CAT_S={"All":"All","Day Tours":"Day Tours","Stay & Tour Packages":"Packages","Transfers & Journeys":"Transfers","Experience Components":"Components","Accommodation":"Stays","Custom":"Custom"};
 const PRICE_STRUCTURES=[
   {value:"per_adult",label:"Per adult (single rate)"},
   {value:"per_couple",label:"Per couple (single rate)"},
@@ -97,6 +97,8 @@ const PRICE_STRUCTURES=[
   {value:"component",label:"Component / included in package"},
   {value:"tiered_per_person_by_group",label:"Tiered per person by group size"},
   {value:"tiered_per_couple_by_group",label:"Tiered per couple by group size"},
+  {value:"per_night",label:"Per night (accommodation)"},
+  {value:"per_night_per_room",label:"Per night per room (accommodation)"},
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -108,6 +110,8 @@ function fmtDateShort(d){if(!d)return"";return new Date(d).toLocaleDateString("e
 function formatPrice(pricing){
   const{structure,tiers}=pricing;
   if(structure==="on_request")return"Price on request";
+  if(structure==="per_night")return`$${(tiers[0]?.retail||0).toLocaleString()} per night`;
+  if(structure==="per_night_per_room")return`$${(tiers[0]?.retail||0).toLocaleString()} per room per night`;
   if(structure==="component")return"See package";
   if(structure==="per_adult")return`$${(tiers[0]?.retail||0).toLocaleString()} per adult`;
   if(structure==="per_couple")return`$${(tiers[0]?.retail||0).toLocaleString()} per couple`;
@@ -577,7 +581,8 @@ function ProductForm({initial,onSave,onCancel}){
   const[tagText,setTagText]=useState((initial?.tags||[]).join(", "));
   const[tierRows,setTierRows]=useState(()=>{const t=initial?.pricing?.tiers||[];return t.length>0?t:[{label:"",retail:0}];});
   const isTiered=p.pricing.structure==="tiered_per_person_by_group"||p.pricing.structure==="tiered_per_couple_by_group";
-  const isSimple=p.pricing.structure==="per_adult"||p.pricing.structure==="per_couple";
+  const isSimple=p.pricing.structure==="per_adult"||p.pricing.structure==="per_couple"||p.pricing.structure==="per_night"||p.pricing.structure==="per_night_per_room";
+  const isAccom=p.category==="Accommodation";
   function setPricing(patch){setP(x=>({...x,pricing:{...x.pricing,...patch}}));}
   function handleSave(){
     if(!p.name.trim()){alert("Product name is required.");return;}
@@ -585,7 +590,10 @@ function ProductForm({initial,onSave,onCancel}){
     const tags=tagText.split(",").map(s=>s.trim()).filter(Boolean);
     let tiers=[];
     if(isTiered)tiers=tierRows.filter(r=>r.label).map(r=>({label:r.label,retail:parseFloat(r.retail)||0}));
-    if(isSimple)tiers=[{label:p.pricing.structure==="per_couple"?"Per couple":"Per adult",retail:parseFloat(tierRows[0]?.retail)||0}];
+    if(isSimple){
+      const lbl = p.pricing.structure==="per_couple"?"Per couple":p.pricing.structure==="per_night"?"Per night":p.pricing.structure==="per_night_per_room"?"Per room per night":"Per adult";
+      tiers=[{label:lbl,retail:parseFloat(tierRows[0]?.retail)||0}];
+    }
     onSave({...p,inclusions,tags,pricing:{...p.pricing,tiers}});
   }
   const fi={fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none",background:C.white,width:"100%"};
@@ -596,23 +604,47 @@ function ProductForm({initial,onSave,onCancel}){
       <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy,marginBottom:12}}>{initial?"Edit Product":"New Custom Product"}</div>
       <div style={{display:"flex",gap:8,marginBottom:10}}>
         <div style={{flex:2,...W}}><label style={L}>Product name *</label><input style={fi} value={p.name} onChange={e=>setP(x=>({...x,name:e.target.value}))} placeholder="Product name"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Category</label><select style={fi} value={p.category} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{["Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Custom"].map(c=><option key={c}>{c}</option>)}</select></div>
+        <div style={{flex:1,...W}}><label style={L}>Category</label><select style={fi} value={p.category} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{["Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Accommodation","Custom"].map(c=><option key={c}>{c}</option>)}</select></div>
       </div>
-      <div style={W}><label style={L}>Subtitle</label><input style={fi} value={p.subtitle||""} onChange={e=>setP(x=>({...x,subtitle:e.target.value}))} placeholder="e.g. Full day private tour · Min 2 / Max 4"/></div>
-      <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:1,...W}}><label style={L}>Type</label><select style={fi} value={p.type} onChange={e=>setP(x=>({...x,type:e.target.value}))}><option value="private">Private</option><option value="small_group">Small Group</option><option value="component">Component</option></select></div>
-        <div style={{flex:1,...W}}><label style={L}>Duration</label><input style={fi} value={p.duration||""} onChange={e=>setP(x=>({...x,duration:e.target.value}))} placeholder="e.g. 6 hrs"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Departures</label><input style={fi} value={p.departures||""} onChange={e=>setP(x=>({...x,departures:e.target.value}))} placeholder="e.g. Daily"/></div>
-      </div>
-      <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:1,...W}}><label style={L}>Location</label><input style={fi} value={p.location||""} onChange={e=>setP(x=>({...x,location:e.target.value}))} placeholder="e.g. Coonawarra · Penola"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Partner</label><input style={fi} value={p.partner||""} onChange={e=>setP(x=>({...x,partner:e.target.value}))} placeholder="Optional"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Rezdy code</label><input style={fi} value={p.rezdy||""} onChange={e=>setP(x=>({...x,rezdy:e.target.value}))} placeholder="Internal only"/></div>
-      </div>
-      <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:1,...W}}><label style={L}>Min guests</label><input style={fi} type="number" value={p.minGuests||""} onChange={e=>setP(x=>({...x,minGuests:parseInt(e.target.value)||null}))} placeholder="2"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Max guests</label><input style={fi} type="number" value={p.maxGuests||""} onChange={e=>setP(x=>({...x,maxGuests:parseInt(e.target.value)||null}))} placeholder="10"/></div>
-      </div>
+      <div style={W}><label style={L}>Subtitle</label><input style={fi} value={p.subtitle||""} onChange={e=>setP(x=>({...x,subtitle:e.target.value}))} placeholder={isAccom?"e.g. 2 bedroom retreat · Sleeps 4 · Penola":"e.g. Full day private tour · Min 2 / Max 4"}/></div>
+
+      {/* Accommodation fields */}
+      {isAccom?(
+        <>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:1,...W}}><label style={L}>Location</label><input style={fi} value={p.location||""} onChange={e=>setP(x=>({...x,location:e.target.value}))} placeholder="e.g. Penola · Limestone Coast"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Property / partner</label><input style={fi} value={p.partner||""} onChange={e=>setP(x=>({...x,partner:e.target.value}))} placeholder="e.g. Warrawindi Escapes"/></div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:1,...W}}><label style={L}>Bedrooms</label><input style={fi} value={p.bedrooms||""} onChange={e=>setP(x=>({...x,bedrooms:e.target.value}))} placeholder="e.g. 2"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Sleeps</label><input style={fi} value={p.sleeps||""} onChange={e=>setP(x=>({...x,sleeps:e.target.value}))} placeholder="e.g. 4"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Min nights</label><input style={fi} type="number" value={p.minNights||""} onChange={e=>setP(x=>({...x,minNights:parseInt(e.target.value)||null}))} placeholder="2"/></div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:1,...W}}><label style={L}>Check-in</label><input style={fi} value={p.checkIn||""} onChange={e=>setP(x=>({...x,checkIn:e.target.value}))} placeholder="e.g. 3:00 PM"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Check-out</label><input style={fi} value={p.checkOut||""} onChange={e=>setP(x=>({...x,checkOut:e.target.value}))} placeholder="e.g. 10:00 AM"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Rezdy code</label><input style={fi} value={p.rezdy||""} onChange={e=>setP(x=>({...x,rezdy:e.target.value}))} placeholder="Internal only"/></div>
+          </div>
+        </>
+      ):(
+        /* Touring fields */
+        <>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:1,...W}}><label style={L}>Type</label><select style={fi} value={p.type} onChange={e=>setP(x=>({...x,type:e.target.value}))}><option value="private">Private</option><option value="small_group">Small Group</option><option value="component">Component</option></select></div>
+            <div style={{flex:1,...W}}><label style={L}>Duration</label><input style={fi} value={p.duration||""} onChange={e=>setP(x=>({...x,duration:e.target.value}))} placeholder="e.g. 6 hrs"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Departures</label><input style={fi} value={p.departures||""} onChange={e=>setP(x=>({...x,departures:e.target.value}))} placeholder="e.g. Daily"/></div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:1,...W}}><label style={L}>Location</label><input style={fi} value={p.location||""} onChange={e=>setP(x=>({...x,location:e.target.value}))} placeholder="e.g. Coonawarra · Penola"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Partner</label><input style={fi} value={p.partner||""} onChange={e=>setP(x=>({...x,partner:e.target.value}))} placeholder="Optional"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Rezdy code</label><input style={fi} value={p.rezdy||""} onChange={e=>setP(x=>({...x,rezdy:e.target.value}))} placeholder="Internal only"/></div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{flex:1,...W}}><label style={L}>Min guests</label><input style={fi} type="number" value={p.minGuests||""} onChange={e=>setP(x=>({...x,minGuests:parseInt(e.target.value)||null}))} placeholder="2"/></div>
+            <div style={{flex:1,...W}}><label style={L}>Max guests</label><input style={fi} type="number" value={p.maxGuests||""} onChange={e=>setP(x=>({...x,maxGuests:parseInt(e.target.value)||null}))} placeholder="10"/></div>
+          </div>
+        </>
+      )}
       <div style={{borderTop:`1px solid ${C.grey100}`,paddingTop:10,marginBottom:10}}>
         <label style={L}>Pricing structure</label>
         <select style={{...fi,marginBottom:8}} value={p.pricing.structure} onChange={e=>setPricing({structure:e.target.value,tiers:[{label:"",retail:0}]})}>
@@ -653,9 +685,19 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
       </div>
       <div style={{padding:"8px 12px"}}>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
-          <Badge color={typeColor(p.type)} xs>{p.type==="small_group"?"Small Group":p.type==="component"?"Component":"Private"}</Badge>
-          {p.duration&&<Badge xs>{p.duration}</Badge>}
-          {p.departures&&<Badge xs>{p.departures}</Badge>}
+          {p.category==="Accommodation"?(
+            <>
+              {p.bedrooms&&<Badge xs>{p.bedrooms} bed</Badge>}
+              {p.sleeps&&<Badge xs>Sleeps {p.sleeps}</Badge>}
+              {p.minNights&&<Badge xs>Min {p.minNights} nights</Badge>}
+            </>
+          ):(
+            <>
+              <Badge color={typeColor(p.type)} xs>{p.type==="small_group"?"Small Group":p.type==="component"?"Component":"Private"}</Badge>
+              {p.duration&&<Badge xs>{p.duration}</Badge>}
+              {p.departures&&<Badge xs>{p.departures}</Badge>}
+            </>
+          )}
         </div>
         {isTiered?<TierTable pricing={p.pricing}/>:<div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra,marginBottom:2}}>{formatPrice(p.pricing)}</div>}
         {p.pricing.note&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginBottom:4}}>{p.pricing.note}</div>}
