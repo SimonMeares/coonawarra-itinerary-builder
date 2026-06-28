@@ -1059,36 +1059,46 @@ function buildHtmlEmailBody(itinerary, allProducts) {
   return html;
 }
 
-async function createGmailDraft(itinerary, allProducts) {
+async function createGmailDraft(itinerary, allProducts, productImages) {
   const subject = `Your Coonawarra Experiences Itinerary — ${itinerary.title}`;
   const to = itinerary.clientEmail || "";
-  const htmlBody = buildHtmlEmailBody(itinerary, allProducts);
   const plainBody = buildEmailBody(itinerary, allProducts);
 
-  // Construct RFC 2822 message
+  // Generate the self-contained HTML itinerary file
+  const htmlItinerary = generateOfflineHTML(itinerary, allProducts, productImages);
+  const fileName = `${(itinerary.clientName||"Itinerary").replace(/[^a-z0-9]/gi,"_")}_${itinerary.title.replace(/[^a-z0-9]/gi,"_")}.html`;
+  const fileB64 = btoa(unescape(encodeURIComponent(htmlItinerary)));
+
+  // Build multipart/mixed email with plain text body + HTML attachment
   const fromAddr = "info@coonawarraexperiences.com.au";
-  const boundary = "boundary_ce_" + Math.random().toString(36).slice(2);
-  const rfcMessage = [
+  const outerBoundary = "outer_" + Math.random().toString(36).slice(2);
+
+  const parts = [
     `From: ${fromAddr}`,
     `To: ${to}`,
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    `Content-Type: multipart/mixed; boundary="${outerBoundary}"`,
     ``,
-    `--${boundary}`,
+    `--${outerBoundary}`,
     `Content-Type: text/plain; charset="UTF-8"`,
+    `Content-Transfer-Encoding: quoted-printable`,
     ``,
     plainBody,
     ``,
-    `--${boundary}`,
-    `Content-Type: text/html; charset="UTF-8"`,
+    `--${outerBoundary}`,
+    `Content-Type: text/html; name="${fileName}"`,
+    `Content-Disposition: attachment; filename="${fileName}"`,
+    `Content-Transfer-Encoding: base64`,
     ``,
-    htmlBody,
+    fileB64,
     ``,
-    `--${boundary}--`,
-  ].join("\r\n");
+    `--${outerBoundary}--`,
+  ];
 
-  // Base64url encode
+  const rfcMessage = parts.join("\r\n");
+
+  // Base64url encode the whole message
   const encoded = btoa(unescape(encodeURIComponent(rfcMessage)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
@@ -1108,7 +1118,7 @@ async function createGmailDraft(itinerary, allProducts) {
 }
 
 // ─── Gmail draft button ───────────────────────────────────────────────────────
-function EmailDraftButton({itinerary,allProducts}){
+function EmailDraftButton({itinerary,allProducts,productImages}){
   const[state,setState]=useState("idle");
   const[msg,setMsg]=useState("");
   const[connected,setConnected]=useState(()=>!!getStoredToken());
@@ -1116,9 +1126,9 @@ function EmailDraftButton({itinerary,allProducts}){
   async function handleClick(){
     setState("loading");setMsg("");
     try{
-      await createGmailDraft(itinerary,allProducts);
+      await createGmailDraft(itinerary,allProducts,productImages);
       setConnected(true);
-      setState("success");setMsg("Draft created in Gmail Drafts");
+      setState("success");setMsg("Draft created — itinerary attached");
       setTimeout(()=>setState("idle"),3500);
     }catch(e){
       if(e.message?.includes("cancelled")||e.message?.includes("Popup")) setState("idle");
@@ -1319,7 +1329,7 @@ export default function App(){
           {tab==="builder"&&active&&bView==="preview"&&(
             <>
               <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
-              <EmailDraftButton itinerary={active} allProducts={allProducts}/>
+              <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages}/>
               <button onClick={()=>{
                 const html=generateOfflineHTML(active,allProducts,productImages);
                 const blob=new Blob([html],{type:"text/html"});
