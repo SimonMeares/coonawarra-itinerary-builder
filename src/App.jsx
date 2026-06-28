@@ -155,8 +155,23 @@ function newItinerary() {
 // ─── Storage ──────────────────────────────────────────────────────────────────
 function loadCP() { try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];} }
 function saveCP(p) { try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){} }
-function loadImgs() { try{const r=localStorage.getItem("ce_product_images_v1");return r?JSON.parse(r):{};}catch(e){return{};} }
-function saveImgs(i) { try{localStorage.setItem("ce_product_images_v1",JSON.stringify(i));}catch(e){alert("Storage full — try removing some images.");} }
+// Cloudinary config — images stored as URLs, not base64
+const CL_CLOUD = "dgzv5n4f3";
+const CL_PRESET = "ce_unsigned";
+
+async function uploadToCloudinary(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("upload_preset", CL_PRESET);
+  fd.append("folder", "coonawarra-experiences");
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CL_CLOUD}/image/upload`, { method:"POST", body:fd });
+  if (!res.ok) throw new Error("Upload failed");
+  const data = await res.json();
+  return data.secure_url.replace("/upload/", "/upload/f_auto,q_auto,w_1400/");
+}
+
+function loadImgs() { try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};} }
+function saveImgs(i) { try{localStorage.setItem("ce_product_images_v2",JSON.stringify(i));}catch(e){alert("Failed to save image references.");} }
 function loadIts() { try{const r=localStorage.getItem("ce_itineraries_v9");return r?JSON.parse(r):[];}catch(e){return[];} }
 function saveIts(l) { try{localStorage.setItem("ce_itineraries_v9",JSON.stringify(l));}catch(e){} }
 
@@ -200,18 +215,28 @@ function TierTable({pricing}){
   );
 }
 
-// ─── Image uploader ───────────────────────────────────────────────────────────
+// ─── Image uploader (Cloudinary) ──────────────────────────────────────────────
 function ImageUploader({productId,images,onImagesChange}){
   const inputRef=useRef();
   const [dragging,setDragging]=useState(false);
-  function readFiles(files){
-    Array.from(files).forEach(file=>{
-      if(!file.type.startsWith("image/")) return;
-      const r=new FileReader();
-      r.onload=e=>onImagesChange(productId,[...(images||[]),e.target.result]);
-      r.readAsDataURL(file);
-    });
+  const [uploading,setUploading]=useState(false);
+  const [error,setError]=useState(null);
+
+  async function handleFiles(files){
+    const imageFiles=Array.from(files).filter(f=>f.type.startsWith("image/"));
+    if(!imageFiles.length) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const urls = await Promise.all(imageFiles.map(f=>uploadToCloudinary(f)));
+      onImagesChange(productId,[...(images||[]),...urls]);
+    } catch(e) {
+      setError("Upload failed — check your connection and try again.");
+    } finally {
+      setUploading(false);
+    }
   }
+
   const imgs=images||[];
   return(
     <div style={{marginTop:6}}>
@@ -219,7 +244,7 @@ function ImageUploader({productId,images,onImagesChange}){
         <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
           {imgs.map((src,i)=>(
             <div key={i} className="img-thumb" style={{width:52,height:40}}>
-              <img src={src} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:`1px solid ${C.grey200}`}}/>
+              <img src={src} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:`1px solid ${C.grey200}`}} crossOrigin="anonymous"/>
               <button className="img-thumb-del" onClick={()=>onImagesChange(productId,imgs.filter((_,j)=>j!==i))}>×</button>
             </div>
           ))}
@@ -228,14 +253,20 @@ function ImageUploader({productId,images,onImagesChange}){
       <div className={`img-drop-zone${dragging?" drag-over":""}`}
         onDragOver={e=>{e.preventDefault();setDragging(true);}}
         onDragLeave={()=>setDragging(false)}
-        onDrop={e=>{e.preventDefault();setDragging(false);readFiles(e.dataTransfer.files);}}
-        onClick={()=>inputRef.current.click()}>
-        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>
-          {imgs.length===0?<><span style={{fontSize:14}}>📷</span><br/>Drop images or click to upload</>:<span>+ Add more</span>}
+        onDrop={e=>{e.preventDefault();setDragging(false);handleFiles(e.dataTransfer.files);}}
+        onClick={()=>!uploading&&inputRef.current.click()}>
+        <div style={{fontFamily:F.body,fontSize:10,color:uploading?C.teal:C.grey400}}>
+          {uploading
+            ?<><span style={{fontSize:14}}>⏳</span><br/>Uploading to Cloudinary...</>
+            :imgs.length===0
+              ?<><span style={{fontSize:14}}>📷</span><br/>Drop images or click to upload</>
+              :<span>+ Add more images</span>
+          }
         </div>
-        <input ref={inputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>readFiles(e.target.files)}/>
+        <input ref={inputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
       </div>
-      {imgs.length>0&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:2,textAlign:"center"}}>{imgs.length} image{imgs.length!==1?"s":""} · First used as hero</div>}
+      {error&&<div style={{fontFamily:F.body,fontSize:10,color:C.terra,marginTop:3}}>{error}</div>}
+      {imgs.length>0&&!uploading&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:2,textAlign:"center"}}>{imgs.length} image{imgs.length!==1?"s":""} · Hosted on Cloudinary · First used as hero</div>}
     </div>
   );
 }
