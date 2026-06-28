@@ -44,6 +44,29 @@ International guests must hold comprehensive travel insurance. Coonawarra Experi
 Contact
 Simon & Kerry Meares · 1800 861 190 · info@coonawarraexperiences.com.au · coonawarraexperiences.com.au`;
 
+const DEFAULT_BEFORE_YOU_ARRIVE = `Getting here
+Penola is approximately 4 hours from Adelaide and 5 hours from Melbourne by car. The nearest regional airport is Mount Gambier, around 45 minutes from Penola. Rex Airlines operates daily services from Adelaide and Melbourne.
+
+We recommend arriving no later than 4pm in winter months — wildlife is active at dusk on regional roads and it is safest to complete your drive before dark.
+
+What to pack
+Layers are essential year-round. Mornings and evenings can be cool even in summer. In winter, bring a warm jacket, waterproof layer and sturdy footwear for outdoor stops. Comfortable walking shoes are ideal for cave tours and vineyard walks.
+
+Mobile coverage
+Coverage is patchy in parts of the Limestone Coast and Coonawarra. Telstra provides the most reliable regional coverage. Download your itinerary and any maps before you leave — we will be contactable throughout your journey.
+
+What to expect
+All experiences are privately hosted by Simon and Kerry. Our vehicle is fully air-conditioned and we will collect you from your accommodation. There is no rushing — we take our time and adapt the day to your pace.
+
+A note on dining
+Lunches are set-menu unless otherwise noted. Please let us know of any dietary requirements in advance and we will communicate them to all venues on your behalf.
+
+Emergency contacts
+Simon Meares (mobile): +61 404 092 611
+Kerry Meares (mobile): +61 405 733 477
+Emergency services: 000
+Penola Hospital: +61 8 8737 0000`;
+
 const BUILT_IN_PRODUCTS = [
   {id:"p-uncle-ken",rezdy:"UNCLEKEN",category:"Day Tours",name:"On Country with Uncle Ken",subtitle:"Private cultural experience · Port MacDonnell",type:"private",duration:"3.5 hrs + coastal lunch",departures:"On request",location:"Port MacDonnell",partner:"Bush Adventures",minGuests:2,maxGuests:null,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:1295}],note:"On request"},tags:["Indigenous","Cultural","Wildlife","Coastal"],description:"A private cultural experience with Uncle Ken Jones, NAIDOC Elder and proud Boandik man, on his saltwater Country. Stories, songs and a lifetime of knowledge, shared first-hand by a man who has spent more than fifty years as a wildlife officer and conservationist on this coastline. Afterwards, a secluded beach luncheon — deck chairs in the sand, fresh Southern Rock Lobster with crusty bread and a chilled Coonawarra Riesling.",inclusions:["Private guided walk on Boandik Country with Uncle Ken Jones","Stories, songs and cultural knowledge of the land and sea","Coastal luncheon at a secluded beach","Fresh Southern Rock Lobster with crusty bread and lemon","Chilled Coonawarra Riesling","Premium transport, driven by your hosts","Pick-up and drop-off, Penola / Coonawarra region"]},
   {id:"p-caves-cabernet",rezdy:"PGXR9D",category:"Day Tours",name:"Caves, Cabernet & Kangaroos",subtitle:"Full day private tour · Min 2 / Max 4",type:"private",duration:"8 hrs",schedule:"9:00 – 17:00",departures:"Daily",location:"Naracoorte · Coonawarra · Penola",minGuests:2,maxGuests:4,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:715}],note:null},tags:["Caves","Wine","Wildlife","Olive Oil"],description:"A full day taking in the best of the Limestone Coast — ancient caves, celebrated wine country, a boutique olive grove and a private kangaroo sanctuary not open to the public.",inclusions:["UNESCO World Heritage–listed Naracoorte Caves exploration","Locally sourced produce luncheon at one of the region's best venues","Icon wine tasting at Wynns Coonawarra Estate","Boutique olive oil tasting at a local grove","Private kangaroo sanctuary visit, not open to the public","Premium transport, driven by your hosts","Pick-up and drop-off, Penola / Coonawarra region","All tasting and entry fees included"]},
@@ -65,9 +88,9 @@ const BUILT_IN_PRODUCTS = [
   {id:"p-confido",rezdy:null,category:"Experience Components",name:"Confido Olive Oil",subtitle:"Boutique olive grove tasting · Coonawarra",type:"component",duration:null,departures:null,location:"Coonawarra",minGuests:null,maxGuests:null,pricing:{structure:"component",tiers:[],note:"Included in select tours and packages"},tags:["Olive Oil","Produce","Artisan"],description:"A boutique olive oil experience with the makers at Confido — freshly pressed extra virgin olive oil, tasted straight from the grove.",inclusions:["Hosted olive oil tasting with the producers","Freshly pressed extra virgin olive oil"]},
 ];
 
-const CATS = ["All","Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Custom"];
-const CAT_S = {"All":"All","Day Tours":"Day Tours","Stay & Tour Packages":"Packages","Transfers & Journeys":"Transfers","Experience Components":"Components","Custom":"Custom"};
-const PRICE_STRUCTURES = [
+const CATS=["All","Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Custom"];
+const CAT_S={"All":"All","Day Tours":"Day Tours","Stay & Tour Packages":"Packages","Transfers & Journeys":"Transfers","Experience Components":"Components","Custom":"Custom"};
+const PRICE_STRUCTURES=[
   {value:"per_adult",label:"Per adult (single rate)"},
   {value:"per_couple",label:"Per couple (single rate)"},
   {value:"on_request",label:"Price on request"},
@@ -77,103 +100,92 @@ const PRICE_STRUCTURES = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function uid() { return "c_"+Math.random().toString(36).slice(2,11); }
-function findProduct(allProducts,id) { return allProducts.find(p=>p.id===id); }
+function uid(){return "c_"+Math.random().toString(36).slice(2,11);}
+function findProduct(all,id){return all.find(p=>p.id===id);}
+function fmtDate(d){if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});}
+function fmtDateShort(d){if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"});}
 
-function formatPrice(pricing) {
-  const {structure,tiers}=pricing;
-  if(structure==="on_request") return "Price on request";
-  if(structure==="component") return "See package";
-  if(structure==="per_adult") return `$${(tiers[0]?.retail||0).toLocaleString()} per adult`;
-  if(structure==="per_couple") return `$${(tiers[0]?.retail||0).toLocaleString()} per couple`;
-  if(structure==="tiered_per_person_by_group"||structure==="tiered_per_couple_by_group") {
-    if(!tiers||tiers.length===0) return "Tiered pricing";
+function formatPrice(pricing){
+  const{structure,tiers}=pricing;
+  if(structure==="on_request")return"Price on request";
+  if(structure==="component")return"See package";
+  if(structure==="per_adult")return`$${(tiers[0]?.retail||0).toLocaleString()} per adult`;
+  if(structure==="per_couple")return`$${(tiers[0]?.retail||0).toLocaleString()} per couple`;
+  if(structure==="tiered_per_person_by_group"||structure==="tiered_per_couple_by_group"){
+    if(!tiers||!tiers.length)return"Tiered pricing";
     const lo=tiers[tiers.length-1].retail,hi=tiers[0].retail;
-    return `$${lo}–$${hi} ${structure==="tiered_per_couple_by_group"?"per couple":"per person"}`;
+    return`$${lo}–$${hi} ${structure==="tiered_per_couple_by_group"?"per couple":"per person"}`;
   }
-  return "";
+  return"";
 }
 
-function typeColor(type) {
-  return type==="private"?C.navy:type==="small_group"?C.teal:C.grey400;
-}
+function typeColor(type){return type==="private"?C.navy:type==="small_group"?C.teal:C.grey400;}
 
-function fmtDate(d) {
-  if(!d) return "";
-  return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});
-}
-
-function fmtDateShort(d) {
-  if(!d) return "";
-  return new Date(d).toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"});
-}
-
-// Auto-generate cover highlights from itinerary products
-function buildHighlights(itinerary, allProducts) {
-  const items = itinerary.days.flatMap(d=>d.items);
-  const seen = new Set();
-  const highlights = [];
-  // Nights
-  const nights = itinerary.days.length;
-  if(nights>0) highlights.push({icon:"🌙", label:`${nights} ${nights===1?"Night":"Nights"}`});
-  // Guests
-  if(itinerary.guestCount) highlights.push({icon:"👤", label:`${itinerary.guestCount} ${itinerary.guestCount===1?"Guest":"Guests"}`});
-  // Product tags
-  const tagPriority = ["Wagyu","Caves","Indigenous","Wildlife","Heritage","Wine","Off-Grid","Cultural","Transfer"];
-  for(const tag of tagPriority) {
-    if(highlights.length>=4) break;
-    const hasTag = items.some(item=>{
-      const p=findProduct(allProducts,item.productId);
-      return p?.tags?.includes(tag)&&!seen.has(tag);
-    });
-    if(hasTag) { seen.add(tag); highlights.push({icon:tagIcon(tag),label:tag}); }
+function buildHighlights(itinerary,allProducts){
+  const items=itinerary.days.flatMap(d=>d.items);
+  const seen=new Set();
+  const highlights=[];
+  const nights=itinerary.days.length;
+  if(nights>0)highlights.push({icon:"🌙",label:`${nights} ${nights===1?"Night":"Nights"}`});
+  if(itinerary.guestCount)highlights.push({icon:"👤",label:`${itinerary.guestCount} ${itinerary.guestCount===1?"Guest":"Guests"}`});
+  const tagPriority=["Wagyu","Caves","Indigenous","Wildlife","Heritage","Wine","Off-Grid","Cultural","Transfer","Coastal"];
+  for(const tag of tagPriority){
+    if(highlights.length>=4)break;
+    const has=items.some(item=>{const p=findProduct(allProducts,item.productId);return p?.tags?.includes(tag)&&!seen.has(tag);});
+    if(has){seen.add(tag);highlights.push({icon:tagIcon(tag),label:tag});}
   }
-  // Private hosted
-  const hasPrivate = items.some(item=>{const p=findProduct(allProducts,item.productId);return p?.type==="private";});
-  if(hasPrivate&&highlights.length<5) highlights.push({icon:"🔑",label:"Privately Hosted"});
+  const hasPrivate=items.some(item=>{const p=findProduct(allProducts,item.productId);return p?.type==="private";});
+  if(hasPrivate&&highlights.length<5)highlights.push({icon:"🔑",label:"Privately Hosted"});
   return highlights.slice(0,5);
 }
 
-function tagIcon(tag) {
-  const map={Wagyu:"🥩",Caves:"🦇",Indigenous:"🌿",Wildlife:"🦘",Heritage:"🏛️",Wine:"🍷",
-    "Off-Grid":"🏕️",Cultural:"🎶",Transfer:"🚗",Dining:"🍽️",Coastal:"🌊"};
+function tagIcon(tag){
+  const map={Wagyu:"🥩",Caves:"🦇",Indigenous:"🌿",Wildlife:"🦘",Heritage:"🏛️",Wine:"🍷","Off-Grid":"🏕️",Cultural:"🎶",Transfer:"🚗",Dining:"🍽️",Coastal:"🌊"};
   return map[tag]||"✦";
 }
 
-function newItinerary() {
-  return {
+function newDay(index){
+  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:""};
+}
+
+function newItinerary(){
+  return{
     id:uid(),title:"New Itinerary",clientName:"",clientEmail:"",
     guestCount:2,arrivalDate:"",departureDate:"",origin:"Melbourne",
     status:"draft",totalPrice:"",showPricing:false,
     intro:"",hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they've built with the region's people, places and producers.",
+    beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
     terms:DEFAULT_TERMS,notes:"",
-    days:[{id:uid(),title:"Day 1",date:"",location:"",items:[],dayNotes:""}],
+    attachments:[],
+    guestInfo:{name1:"",name2:"",email:"",phone:"",country:"",dietary:"",medical:"",celebrating:"",notes:""},
+    days:[newDay(1)],
     createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
   };
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
-function loadCP() { try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];} }
-function saveCP(p) { try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){} }
-// Cloudinary config — images stored as URLs, not base64
-const CL_CLOUD = "dgzv5n4f3";
-const CL_PRESET = "ce_unsigned";
+const CL_CLOUD="dgzv5n4f3";
+const CL_PRESET="ce_unsigned";
 
-async function uploadToCloudinary(file) {
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("upload_preset", CL_PRESET);
-  fd.append("folder", "coonawarra-experiences");
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CL_CLOUD}/image/upload`, { method:"POST", body:fd });
-  if (!res.ok) throw new Error("Upload failed");
-  const data = await res.json();
-  return data.secure_url.replace("/upload/", "/upload/f_auto,q_auto,w_1400/");
+async function uploadToCloudinary(file){
+  const fd=new FormData();
+  fd.append("file",file);
+  fd.append("upload_preset",CL_PRESET);
+  fd.append("folder","coonawarra-experiences");
+  const res=await fetch(`https://api.cloudinary.com/v1_1/${CL_CLOUD}/image/upload`,{method:"POST",body:fd});
+  if(!res.ok)throw new Error("Upload failed");
+  const data=await res.json();
+  return data.secure_url.replace("/upload/","/upload/f_auto,q_auto,w_1400/");
 }
 
-function loadImgs() { try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};} }
-function saveImgs(i) { try{localStorage.setItem("ce_product_images_v2",JSON.stringify(i));}catch(e){alert("Failed to save image references.");} }
-function loadIts() { try{const r=localStorage.getItem("ce_itineraries_v9");return r?JSON.parse(r):[];}catch(e){return[];} }
-function saveIts(l) { try{localStorage.setItem("ce_itineraries_v9",JSON.stringify(l));}catch(e){} }
+function loadCP(){try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}}
+function loadImgs(){try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};}}
+function saveImgs(i){try{localStorage.setItem("ce_product_images_v2",JSON.stringify(i));}catch(e){alert("Failed to save image references.");}}
+function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveIts(l){try{localStorage.setItem("ce_itineraries_v10",JSON.stringify(l));}catch(e){}}
+function loadTemplates(){try{const r=localStorage.getItem("ce_templates_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
+function saveTemplates(t){try{localStorage.setItem("ce_templates_v1",JSON.stringify(t));}catch(e){}}
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS=`
@@ -188,6 +200,8 @@ input,textarea,select,button{font-family:inherit;}
 .img-drop-zone:hover,.img-drop-zone.drag-over{border-color:#40c0c0;background:#e0f7f733;}
 .img-thumb{position:relative;display:inline-block;}
 .img-thumb-del{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#d34727;color:white;border:none;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;padding:0;}
+.pdf-drop{border:2px dashed #e8e6e0;border-radius:6px;padding:12px;cursor:pointer;transition:border-color .15s;}
+.pdf-drop:hover{border-color:#40c0c0;}
 @media print{
   .no-print{display:none!important;}
   body{background:white;}
@@ -198,71 +212,46 @@ input,textarea,select,button{font-family:inherit;}
 
 // ─── Small components ─────────────────────────────────────────────────────────
 function Badge({color,children,xs}){
-  return <span style={{display:"inline-block",fontFamily:F.body,fontSize:xs?9:10,fontWeight:600,color:color||C.navy,background:color?`${color}18`:C.sandLight,border:`1px solid ${color?color+"30":C.sandDark}`,borderRadius:20,padding:xs?"1px 5px":"2px 8px",letterSpacing:"0.04em",textTransform:"uppercase"}}>{children}</span>;
+  return<span style={{display:"inline-block",fontFamily:F.body,fontSize:xs?9:10,fontWeight:600,color:color||C.navy,background:color?`${color}18`:C.sandLight,border:`1px solid ${color?color+"30":C.sandDark}`,borderRadius:20,padding:xs?"1px 5px":"2px 8px",letterSpacing:"0.04em",textTransform:"uppercase"}}>{children}</span>;
 }
 
 function TierTable({pricing}){
-  if(!["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(pricing.structure)||!pricing.tiers?.length) return null;
+  if(!["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(pricing.structure)||!pricing.tiers?.length)return null;
+  return<table style={{width:"100%",borderCollapse:"collapse",marginTop:4}}><tbody>{pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"2px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,textAlign:"right",fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>;
+}
+
+// ─── Section box ──────────────────────────────────────────────────────────────
+function SectionBox({title,children,accent}){
   return(
-    <table style={{width:"100%",borderCollapse:"collapse",marginTop:4}}>
-      <tbody>{pricing.tiers.map((t,i)=>(
-        <tr key={i}>
-          <td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"2px 0"}}>{t.label}</td>
-          <td style={{fontFamily:F.heading,fontSize:12,color:C.terra,textAlign:"right",fontWeight:700}}>${(t.retail||0).toLocaleString()}</td>
-        </tr>
-      ))}</tbody>
-    </table>
+    <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden",marginTop:12}}>
+      <div style={{background:accent||C.grey100,padding:"8px 14px",borderBottom:`1px solid ${C.grey200}`}}>
+        <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:accent?C.white:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>{title}</span>
+      </div>
+      <div style={{padding:14}}>{children}</div>
+    </div>
   );
 }
 
-// ─── Image uploader (Cloudinary) ──────────────────────────────────────────────
+// ─── Image uploader ───────────────────────────────────────────────────────────
 function ImageUploader({productId,images,onImagesChange}){
   const inputRef=useRef();
-  const [dragging,setDragging]=useState(false);
-  const [uploading,setUploading]=useState(false);
-  const [error,setError]=useState(null);
-
+  const[dragging,setDragging]=useState(false);
+  const[uploading,setUploading]=useState(false);
+  const[error,setError]=useState(null);
   async function handleFiles(files){
     const imageFiles=Array.from(files).filter(f=>f.type.startsWith("image/"));
-    if(!imageFiles.length) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const urls = await Promise.all(imageFiles.map(f=>uploadToCloudinary(f)));
-      onImagesChange(productId,[...(images||[]),...urls]);
-    } catch(e) {
-      setError("Upload failed — check your connection and try again.");
-    } finally {
-      setUploading(false);
-    }
+    if(!imageFiles.length)return;
+    setUploading(true);setError(null);
+    try{const urls=await Promise.all(imageFiles.map(f=>uploadToCloudinary(f)));onImagesChange(productId,[...(images||[]),...urls]);}
+    catch(e){setError("Upload failed — check connection and try again.");}
+    finally{setUploading(false);}
   }
-
   const imgs=images||[];
   return(
     <div style={{marginTop:6}}>
-      {imgs.length>0&&(
-        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
-          {imgs.map((src,i)=>(
-            <div key={i} className="img-thumb" style={{width:52,height:40}}>
-              <img src={src} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:`1px solid ${C.grey200}`}} crossOrigin="anonymous"/>
-              <button className="img-thumb-del" onClick={()=>onImagesChange(productId,imgs.filter((_,j)=>j!==i))}>×</button>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className={`img-drop-zone${dragging?" drag-over":""}`}
-        onDragOver={e=>{e.preventDefault();setDragging(true);}}
-        onDragLeave={()=>setDragging(false)}
-        onDrop={e=>{e.preventDefault();setDragging(false);handleFiles(e.dataTransfer.files);}}
-        onClick={()=>!uploading&&inputRef.current.click()}>
-        <div style={{fontFamily:F.body,fontSize:10,color:uploading?C.teal:C.grey400}}>
-          {uploading
-            ?<><span style={{fontSize:14}}>⏳</span><br/>Uploading to Cloudinary...</>
-            :imgs.length===0
-              ?<><span style={{fontSize:14}}>📷</span><br/>Drop images or click to upload</>
-              :<span>+ Add more images</span>
-          }
-        </div>
+      {imgs.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>{imgs.map((src,i)=><div key={i} className="img-thumb" style={{width:52,height:40}}><img src={src} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:`1px solid ${C.grey200}`}} crossOrigin="anonymous"/><button className="img-thumb-del" onClick={()=>onImagesChange(productId,imgs.filter((_,j)=>j!==i))}>×</button></div>)}</div>}
+      <div className={`img-drop-zone${dragging?" drag-over":""}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);handleFiles(e.dataTransfer.files);}} onClick={()=>!uploading&&inputRef.current.click()}>
+        <div style={{fontFamily:F.body,fontSize:10,color:uploading?C.teal:C.grey400}}>{uploading?<><span style={{fontSize:14}}>⏳</span><br/>Uploading to Cloudinary...</>:imgs.length===0?<><span style={{fontSize:14}}>📷</span><br/>Drop images or click to upload</>:<span>+ Add more images</span>}</div>
         <input ref={inputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
       </div>
       {error&&<div style={{fontFamily:F.body,fontSize:10,color:C.terra,marginTop:3}}>{error}</div>}
@@ -272,21 +261,156 @@ function ImageUploader({productId,images,onImagesChange}){
 }
 
 function ImageStrip({images}){
-  if(!images?.length) return null;
+  if(!images?.length)return null;
   const show=images.slice(0,4);
+  return<div style={{display:"grid",gridTemplateColumns:`repeat(${show.length},1fr)`,gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>{show.map((src,i)=><img key={i} src={src} alt="" style={{width:"100%",height:show.length===1?160:90,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>)}</div>;
+}
+
+// ─── PDF attachment manager ───────────────────────────────────────────────────
+function AttachmentManager({attachments,onUpdate}){
+  const inputRef=useRef();
+  function handleFiles(files){
+    Array.from(files).forEach(file=>{
+      if(file.type!=="application/pdf")return;
+      const reader=new FileReader();
+      reader.onload=e=>{
+        const att={id:uid(),name:file.name,size:Math.round(file.size/1024),data:e.target.result};
+        onUpdate([...(attachments||[]),att]);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  const atts=attachments||[];
   return(
-    <div style={{display:"grid",gridTemplateColumns:`repeat(${show.length},1fr)`,gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
-      {show.map((src,i)=><img key={i} src={src} alt="" style={{width:"100%",height:show.length===1?160:90,objectFit:"cover",display:"block"}}/>)}
+    <div>
+      {atts.length>0&&(
+        <div style={{marginBottom:8}}>
+          {atts.map(att=>(
+            <div key={att.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:C.grey100,borderRadius:6,marginBottom:4}}>
+              <span style={{fontSize:16}}>📄</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:F.body,fontSize:12,color:C.navy,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{att.name}</div>
+                <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{att.size} KB</div>
+              </div>
+              <button onClick={()=>onUpdate(atts.filter(a=>a.id!==att.id))} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}30`,borderRadius:4,padding:"2px 8px"}}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="pdf-drop" onClick={()=>inputRef.current.click()}>
+        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,textAlign:"center"}}>
+          <span style={{fontSize:16}}>📎</span>
+          <div style={{marginTop:3}}>Click to attach PDF documents</div>
+          <div style={{fontSize:10,marginTop:1}}>Rate sheets, maps, dossiers, partner packs</div>
+        </div>
+        <input ref={inputRef} type="file" accept="application/pdf" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
+      </div>
+      {atts.length>0&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:3,textAlign:"center"}}>PDFs stored in browser — listed in itinerary footer</div>}
+    </div>
+  );
+}
+
+// ─── Guest info form ──────────────────────────────────────────────────────────
+function GuestInfoForm({guestInfo,onChange}){
+  const gi=guestInfo||{};
+  const fi={fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none",background:C.white,width:"100%"};
+  const L={fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3};
+  const W={marginBottom:10};
+  return(
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        <div style={{flex:1,...W}}><label style={L}>Guest 1 full name</label><input style={fi} value={gi.name1||""} onChange={e=>onChange({...gi,name1:e.target.value})} placeholder="First and last name"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Guest 2 full name</label><input style={fi} value={gi.name2||""} onChange={e=>onChange({...gi,name2:e.target.value})} placeholder="First and last name (if applicable)"/></div>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        <div style={{flex:1,...W}}><label style={L}>Contact email</label><input style={fi} type="email" value={gi.email||""} onChange={e=>onChange({...gi,email:e.target.value})} placeholder="Guest email address"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Contact phone</label><input style={fi} value={gi.phone||""} onChange={e=>onChange({...gi,phone:e.target.value})} placeholder="Inc. country code"/></div>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        <div style={{flex:1,...W}}><label style={L}>Country of residence</label><input style={fi} value={gi.country||""} onChange={e=>onChange({...gi,country:e.target.value})} placeholder="e.g. United Kingdom"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Celebrating anything?</label><input style={fi} value={gi.celebrating||""} onChange={e=>onChange({...gi,celebrating:e.target.value})} placeholder="e.g. Anniversary, birthday"/></div>
+      </div>
+      <div style={W}><label style={L}>Dietary requirements</label><textarea style={{...fi,resize:"vertical",minHeight:50,padding:"6px 8px"}} value={gi.dietary||""} onChange={e=>onChange({...gi,dietary:e.target.value})} placeholder="Any dietary requirements, allergies or intolerances for all guests"/></div>
+      <div style={W}><label style={L}>Medical / mobility notes</label><textarea style={{...fi,resize:"vertical",minHeight:50,padding:"6px 8px"}} value={gi.medical||""} onChange={e=>onChange({...gi,medical:e.target.value})} placeholder="Any medical conditions or mobility considerations we should know about"/></div>
+      <div style={W}><label style={L}>Additional notes</label><textarea style={{...fi,resize:"vertical",minHeight:50,padding:"6px 8px"}} value={gi.notes||""} onChange={e=>onChange({...gi,notes:e.target.value})} placeholder="Anything else useful — preferences, special requests, travel style"/></div>
+      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,padding:"8px 10px",background:C.grey100,borderRadius:6}}>
+        Guest information is stored locally in this browser and never transmitted externally. It is for your operational use only and does not appear in client-facing output.
+      </div>
+    </div>
+  );
+}
+
+// ─── Template manager ─────────────────────────────────────────────────────────
+function TemplateManager({templates,onLoad,onDelete,onClose}){
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.6)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:C.white,borderRadius:12,width:560,maxHeight:"80vh",overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+        <div style={{background:C.navy,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontFamily:F.heading,fontSize:15,fontWeight:700,color:C.white}}>Itinerary Templates</div>
+          <button onClick={onClose} style={{fontFamily:F.body,fontSize:18,color:"rgba(255,255,255,0.6)",background:"transparent",border:"none",lineHeight:1,padding:0}}>×</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:16}}>
+          {templates.length===0?(
+            <div style={{textAlign:"center",padding:"40px 20px",color:C.grey400,fontFamily:F.body,fontSize:13}}>
+              <div style={{fontSize:32,marginBottom:8}}>📋</div>
+              No templates saved yet.
+              <div style={{fontSize:11,marginTop:4}}>Save any itinerary as a template from the Edit view.</div>
+            </div>
+          ):templates.map(t=>(
+            <div key={t.id} style={{background:C.grey100,borderRadius:8,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy}}>{t.name}</div>
+                <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:2}}>
+                  {t.days?.length||0} days · {t.savedAt?new Date(t.savedAt).toLocaleDateString("en-AU"):""}
+                </div>
+                {t.description&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600,marginTop:3,fontStyle:"italic"}}>{t.description}</div>}
+              </div>
+              <div style={{display:"flex",gap:5,flexShrink:0}}>
+                <button onClick={()=>onLoad(t)} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"5px 12px"}}>Use</button>
+                <button onClick={()=>onDelete(t.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}30`,borderRadius:5,padding:"5px 10px"}}>Del</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Save as template modal ───────────────────────────────────────────────────
+function SaveTemplateModal({itinerary,onSave,onClose}){
+  const[name,setName]=useState(itinerary.title||"");
+  const[desc,setDesc]=useState("");
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.6)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:C.white,borderRadius:12,width:420,padding:24,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+        <div style={{fontFamily:F.heading,fontSize:15,fontWeight:700,color:C.navy,marginBottom:14}}>Save as Template</div>
+        <div style={{marginBottom:10}}>
+          <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Template name</label>
+          <input value={name} onChange={e=>setName(e.target.value)} style={{width:"100%",fontFamily:F.body,fontSize:13,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"6px 10px",outline:"none"}} placeholder="e.g. 2 Night Warrawindi Package"/>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Description (optional)</label>
+          <textarea value={desc} onChange={e=>setDesc(e.target.value)} rows={2} style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"6px 10px",outline:"none",resize:"vertical"}} placeholder="Brief description of what this template covers"/>
+        </div>
+        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:16,background:C.grey100,padding:"8px 12px",borderRadius:6}}>
+          Saves the day structure, products, intro, host bio, T&amp;C and Before You Arrive sections. Client name, dates and guest info are not saved.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{if(name.trim())onSave(name.trim(),desc.trim());}} style={{flex:1,fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:6,padding:"8px 0"}}>Save Template</button>
+          <button onClick={onClose} style={{fontFamily:F.body,fontSize:12,color:C.grey600,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 16px"}}>Cancel</button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ─── Custom product form ──────────────────────────────────────────────────────
 function ProductForm({initial,onSave,onCancel}){
-  const [p,setP]=useState(()=>initial||{id:uid(),custom:true,category:"Day Tours",name:"",subtitle:"",type:"private",duration:"",departures:"",location:"",partner:"",minGuests:2,maxGuests:null,rezdy:"",pricing:{structure:"per_adult",tiers:[{label:"",retail:0}],note:""},tags:[],description:"",inclusions:[]});
-  const [incText,setIncText]=useState((initial?.inclusions||[]).join("\n"));
-  const [tagText,setTagText]=useState((initial?.tags||[]).join(", "));
-  const [tierRows,setTierRows]=useState(()=>{const t=initial?.pricing?.tiers||[];return t.length>0?t:[{label:"",retail:0}];});
+  const[p,setP]=useState(()=>initial||{id:uid(),custom:true,category:"Day Tours",name:"",subtitle:"",type:"private",duration:"",departures:"",location:"",partner:"",minGuests:2,maxGuests:null,rezdy:"",pricing:{structure:"per_adult",tiers:[{label:"",retail:0}],note:""},tags:[],description:"",inclusions:[]});
+  const[incText,setIncText]=useState((initial?.inclusions||[]).join("\n"));
+  const[tagText,setTagText]=useState((initial?.tags||[]).join(", "));
+  const[tierRows,setTierRows]=useState(()=>{const t=initial?.pricing?.tiers||[];return t.length>0?t:[{label:"",retail:0}];});
   const isTiered=p.pricing.structure==="tiered_per_person_by_group"||p.pricing.structure==="tiered_per_couple_by_group";
   const isSimple=p.pricing.structure==="per_adult"||p.pricing.structure==="per_couple";
   function setPricing(patch){setP(x=>({...x,pricing:{...x.pricing,...patch}}));}
@@ -295,47 +419,47 @@ function ProductForm({initial,onSave,onCancel}){
     const inclusions=incText.split("\n").map(s=>s.trim()).filter(Boolean);
     const tags=tagText.split(",").map(s=>s.trim()).filter(Boolean);
     let tiers=[];
-    if(isTiered) tiers=tierRows.filter(r=>r.label).map(r=>({label:r.label,retail:parseFloat(r.retail)||0}));
-    if(isSimple) tiers=[{label:p.pricing.structure==="per_couple"?"Per couple":"Per adult",retail:parseFloat(tierRows[0]?.retail)||0}];
+    if(isTiered)tiers=tierRows.filter(r=>r.label).map(r=>({label:r.label,retail:parseFloat(r.retail)||0}));
+    if(isSimple)tiers=[{label:p.pricing.structure==="per_couple"?"Per couple":"Per adult",retail:parseFloat(tierRows[0]?.retail)||0}];
     onSave({...p,inclusions,tags,pricing:{...p.pricing,tiers}});
   }
-  const F2={fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none",background:C.white,width:"100%"};
+  const fi={fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none",background:C.white,width:"100%"};
   const L={fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3};
   const W={marginBottom:10};
   return(
     <div style={{background:C.white,border:`2px solid ${C.teal}`,borderRadius:10,padding:14,marginBottom:12}}>
       <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy,marginBottom:12}}>{initial?"Edit Product":"New Custom Product"}</div>
       <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:2,...W}}><label style={L}>Product name *</label><input style={F2} value={p.name} onChange={e=>setP(x=>({...x,name:e.target.value}))} placeholder="Product name"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Category</label><select style={F2} value={p.category} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{["Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Custom"].map(c=><option key={c}>{c}</option>)}</select></div>
+        <div style={{flex:2,...W}}><label style={L}>Product name *</label><input style={fi} value={p.name} onChange={e=>setP(x=>({...x,name:e.target.value}))} placeholder="Product name"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Category</label><select style={fi} value={p.category} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{["Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Custom"].map(c=><option key={c}>{c}</option>)}</select></div>
       </div>
-      <div style={W}><label style={L}>Subtitle</label><input style={F2} value={p.subtitle||""} onChange={e=>setP(x=>({...x,subtitle:e.target.value}))} placeholder="e.g. Full day private tour · Min 2 / Max 4"/></div>
+      <div style={W}><label style={L}>Subtitle</label><input style={fi} value={p.subtitle||""} onChange={e=>setP(x=>({...x,subtitle:e.target.value}))} placeholder="e.g. Full day private tour · Min 2 / Max 4"/></div>
       <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:1,...W}}><label style={L}>Type</label><select style={F2} value={p.type} onChange={e=>setP(x=>({...x,type:e.target.value}))}><option value="private">Private</option><option value="small_group">Small Group</option><option value="component">Component</option></select></div>
-        <div style={{flex:1,...W}}><label style={L}>Duration</label><input style={F2} value={p.duration||""} onChange={e=>setP(x=>({...x,duration:e.target.value}))} placeholder="e.g. 6 hrs"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Departures</label><input style={F2} value={p.departures||""} onChange={e=>setP(x=>({...x,departures:e.target.value}))} placeholder="e.g. Daily"/></div>
-      </div>
-      <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:1,...W}}><label style={L}>Location</label><input style={F2} value={p.location||""} onChange={e=>setP(x=>({...x,location:e.target.value}))} placeholder="e.g. Coonawarra · Penola"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Partner</label><input style={F2} value={p.partner||""} onChange={e=>setP(x=>({...x,partner:e.target.value}))} placeholder="Optional"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Rezdy code</label><input style={F2} value={p.rezdy||""} onChange={e=>setP(x=>({...x,rezdy:e.target.value}))} placeholder="Internal"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Type</label><select style={fi} value={p.type} onChange={e=>setP(x=>({...x,type:e.target.value}))}><option value="private">Private</option><option value="small_group">Small Group</option><option value="component">Component</option></select></div>
+        <div style={{flex:1,...W}}><label style={L}>Duration</label><input style={fi} value={p.duration||""} onChange={e=>setP(x=>({...x,duration:e.target.value}))} placeholder="e.g. 6 hrs"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Departures</label><input style={fi} value={p.departures||""} onChange={e=>setP(x=>({...x,departures:e.target.value}))} placeholder="e.g. Daily"/></div>
       </div>
       <div style={{display:"flex",gap:8,marginBottom:10}}>
-        <div style={{flex:1,...W}}><label style={L}>Min guests</label><input style={F2} type="number" value={p.minGuests||""} onChange={e=>setP(x=>({...x,minGuests:parseInt(e.target.value)||null}))} placeholder="2"/></div>
-        <div style={{flex:1,...W}}><label style={L}>Max guests</label><input style={F2} type="number" value={p.maxGuests||""} onChange={e=>setP(x=>({...x,maxGuests:parseInt(e.target.value)||null}))} placeholder="10"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Location</label><input style={fi} value={p.location||""} onChange={e=>setP(x=>({...x,location:e.target.value}))} placeholder="e.g. Coonawarra · Penola"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Partner</label><input style={fi} value={p.partner||""} onChange={e=>setP(x=>({...x,partner:e.target.value}))} placeholder="Optional"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Rezdy code</label><input style={fi} value={p.rezdy||""} onChange={e=>setP(x=>({...x,rezdy:e.target.value}))} placeholder="Internal only"/></div>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        <div style={{flex:1,...W}}><label style={L}>Min guests</label><input style={fi} type="number" value={p.minGuests||""} onChange={e=>setP(x=>({...x,minGuests:parseInt(e.target.value)||null}))} placeholder="2"/></div>
+        <div style={{flex:1,...W}}><label style={L}>Max guests</label><input style={fi} type="number" value={p.maxGuests||""} onChange={e=>setP(x=>({...x,maxGuests:parseInt(e.target.value)||null}))} placeholder="10"/></div>
       </div>
       <div style={{borderTop:`1px solid ${C.grey100}`,paddingTop:10,marginBottom:10}}>
         <label style={L}>Pricing structure</label>
-        <select style={{...F2,marginBottom:8}} value={p.pricing.structure} onChange={e=>setPricing({structure:e.target.value,tiers:[{label:"",retail:0}]})}>
+        <select style={{...fi,marginBottom:8}} value={p.pricing.structure} onChange={e=>setPricing({structure:e.target.value,tiers:[{label:"",retail:0}]})}>
           {PRICE_STRUCTURES.map(ps=><option key={ps.value} value={ps.value}>{ps.label}</option>)}
         </select>
-        {isSimple&&<div style={{display:"flex",gap:8}}><div style={{flex:1}}><label style={L}>Price (AUD)</label><input style={F2} type="number" value={tierRows[0]?.retail||""} onChange={e=>setTierRows([{label:"",retail:e.target.value}])} placeholder="0.00"/></div><div style={{flex:2}}><label style={L}>Price note</label><input style={F2} value={p.pricing.note||""} onChange={e=>setPricing({note:e.target.value})} placeholder="e.g. On request"/></div></div>}
-        {isTiered&&<div><label style={L}>Pricing tiers</label>{tierRows.map((row,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center"}}><input style={{...F2,flex:2}} value={row.label} onChange={e=>setTierRows(r=>r.map((x,j)=>j===i?{...x,label:e.target.value}:x))} placeholder="e.g. 2 guests"/><input style={{...F2,flex:1}} type="number" value={row.retail} onChange={e=>setTierRows(r=>r.map((x,j)=>j===i?{...x,retail:e.target.value}:x))} placeholder="Price"/>{tierRows.length>1&&<button onClick={()=>setTierRows(r=>r.filter((_,j)=>j!==i))} style={{color:C.terra,background:"transparent",border:"none",fontSize:16,fontWeight:700,padding:"0 4px"}}>×</button>}</div>)}<button onClick={()=>setTierRows(r=>[...r,{label:"",retail:0}])} style={{fontFamily:F.body,fontSize:11,color:C.teal,background:"transparent",border:`1px solid ${C.teal}40`,borderRadius:5,padding:"3px 10px"}}>+ Add tier</button><div style={{marginTop:6}}><label style={L}>Pricing note</label><input style={F2} value={p.pricing.note||""} onChange={e=>setPricing({note:e.target.value})} placeholder="e.g. Per person, priced by group size"/></div></div>}
-        {(p.pricing.structure==="on_request"||p.pricing.structure==="component")&&<div style={W}><label style={L}>Note</label><input style={F2} value={p.pricing.note||""} onChange={e=>setPricing({note:e.target.value})} placeholder="e.g. Price on request"/></div>}
+        {isSimple&&<div style={{display:"flex",gap:8}}><div style={{flex:1}}><label style={L}>Price (AUD)</label><input style={fi} type="number" value={tierRows[0]?.retail||""} onChange={e=>setTierRows([{label:"",retail:e.target.value}])} placeholder="0.00"/></div><div style={{flex:2}}><label style={L}>Price note</label><input style={fi} value={p.pricing.note||""} onChange={e=>setPricing({note:e.target.value})} placeholder="e.g. On request"/></div></div>}
+        {isTiered&&<div><label style={L}>Tiers</label>{tierRows.map((row,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center"}}><input style={{...fi,flex:2}} value={row.label} onChange={e=>setTierRows(r=>r.map((x,j)=>j===i?{...x,label:e.target.value}:x))} placeholder="e.g. 2 guests"/><input style={{...fi,flex:1}} type="number" value={row.retail} onChange={e=>setTierRows(r=>r.map((x,j)=>j===i?{...x,retail:e.target.value}:x))} placeholder="Price"/>{tierRows.length>1&&<button onClick={()=>setTierRows(r=>r.filter((_,j)=>j!==i))} style={{color:C.terra,background:"transparent",border:"none",fontSize:16,fontWeight:700,padding:"0 4px"}}>×</button>}</div>)}<button onClick={()=>setTierRows(r=>[...r,{label:"",retail:0}])} style={{fontFamily:F.body,fontSize:11,color:C.teal,background:"transparent",border:`1px solid ${C.teal}40`,borderRadius:5,padding:"3px 10px"}}>+ Add tier</button><div style={{marginTop:6}}><label style={L}>Pricing note</label><input style={fi} value={p.pricing.note||""} onChange={e=>setPricing({note:e.target.value})} placeholder="e.g. Per person, priced by group size"/></div></div>}
+        {(p.pricing.structure==="on_request"||p.pricing.structure==="component")&&<div style={W}><label style={L}>Note</label><input style={fi} value={p.pricing.note||""} onChange={e=>setPricing({note:e.target.value})} placeholder="e.g. Price on request"/></div>}
       </div>
-      <div style={W}><label style={L}>Description</label><textarea style={{...F2,resize:"vertical",minHeight:70,padding:"6px 8px"}} value={p.description||""} onChange={e=>setP(x=>({...x,description:e.target.value}))} placeholder="Description as it appears in the itinerary..."/></div>
-      <div style={W}><label style={L}>Inclusions (one per line)</label><textarea style={{...F2,resize:"vertical",minHeight:70,padding:"6px 8px"}} value={incText} onChange={e=>setIncText(e.target.value)} placeholder={"Premium transport, driven by your hosts\nAll tasting fees included"}/></div>
-      <div style={W}><label style={L}>Tags (comma separated)</label><input style={F2} value={tagText} onChange={e=>setTagText(e.target.value)} placeholder="Wine, Cellar Door, Private"/></div>
+      <div style={W}><label style={L}>Description</label><textarea style={{...fi,resize:"vertical",minHeight:70,padding:"6px 8px"}} value={p.description||""} onChange={e=>setP(x=>({...x,description:e.target.value}))} placeholder="Description as it appears in the itinerary..."/></div>
+      <div style={W}><label style={L}>Inclusions (one per line)</label><textarea style={{...fi,resize:"vertical",minHeight:70,padding:"6px 8px"}} value={incText} onChange={e=>setIncText(e.target.value)} placeholder={"Premium transport, driven by your hosts\nAll tasting fees included"}/></div>
+      <div style={W}><label style={L}>Tags (comma separated)</label><input style={fi} value={tagText} onChange={e=>setTagText(e.target.value)} placeholder="Wine, Cellar Door, Private"/></div>
       <div style={{display:"flex",gap:8,marginTop:4}}>
         <button onClick={handleSave} style={{flex:1,fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:6,padding:"8px 0"}}>{initial?"Save Changes":"Create Product"}</button>
         <button onClick={onCancel} style={{fontFamily:F.body,fontSize:12,color:C.grey600,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 16px"}}>Cancel</button>
@@ -346,13 +470,13 @@ function ProductForm({initial,onSave,onCancel}){
 
 // ─── Library card ─────────────────────────────────────────────────────────────
 function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,onDelete}){
-  const [open,setOpen]=useState(false);
-  const [imgOpen,setImgOpen]=useState(false);
+  const[open,setOpen]=useState(false);
+  const[imgOpen,setImgOpen]=useState(false);
   const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
   const heroImg=images?.[0];
   return(
     <div style={{background:C.white,border:`1px solid ${p.custom?C.teal:C.grey200}`,borderRadius:8,overflow:"hidden",marginBottom:8}}>
-      {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:80,objectFit:"cover",display:"block"}}/>}
+      {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:80,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>}
       <div style={{background:heroImg?"transparent":C.navy,padding:"8px 12px"}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:4}}>
           <div>
@@ -381,7 +505,7 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
                 <button onClick={()=>setImgOpen(v=>!v)} style={{fontFamily:F.body,fontSize:10,color:C.teal,background:"transparent",border:"none",textDecoration:"underline"}}>{imgOpen?"Hide":"Manage"}</button>
               </div>
               {imgOpen&&<ImageUploader productId={p.id} images={images} onImagesChange={onImagesChange}/>}
-              {!imgOpen&&(images?.length>0?<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{images.length} image{images.length!==1?"s":""} uploaded</div>:<div style={{fontFamily:F.body,fontSize:10,color:C.grey200}}>No images yet</div>)}
+              {!imgOpen&&(images?.length>0?<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{images.length} image{images.length!==1?"s":""} on Cloudinary</div>:<div style={{fontFamily:F.body,fontSize:10,color:C.grey200}}>No images yet</div>)}
             </div>
           </>
         )}
@@ -397,12 +521,12 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
 // ─── Day item ─────────────────────────────────────────────────────────────────
 function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,heroImg,allProducts,showPricing}){
   const p=findProduct(allProducts,item.productId);
-  const [editNote,setEditNote]=useState(false);
-  const [noteVal,setNoteVal]=useState(item.notes||"");
-  if(!p) return null;
+  const[editNote,setEditNote]=useState(false);
+  const[noteVal,setNoteVal]=useState(item.notes||"");
+  if(!p)return null;
   return(
     <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,marginBottom:6,overflow:"hidden"}}>
-      {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:50,objectFit:"cover",display:"block"}}/>}
+      {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:50,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>}
       <div style={{display:"flex",gap:8,padding:"8px 10px"}}>
         <div style={{width:3,borderRadius:2,background:typeColor(p.type),flexShrink:0,alignSelf:"stretch"}}/>
         <div style={{flex:1,minWidth:0}}>
@@ -434,16 +558,17 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
 }
 
 // ─── Day card ─────────────────────────────────────────────────────────────────
-function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onRemove}){
+function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onRemove,onDuplicate}){
   const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
   return(
     <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden",marginBottom:14}}>
       <div style={{background:C.sandLight,borderBottom:`1px solid ${C.grey200}`,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
         <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase",flexShrink:0}}>DAY {dayIndex+1}</span>
         <input value={day.title} onChange={e=>onUpdate({...day,title:e.target.value})} style={{flex:1,fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,background:"transparent",border:"none",outline:"none"}} placeholder={`Day ${dayIndex+1}`}/>
-        <input value={day.location||""} onChange={e=>onUpdate({...day,location:e.target.value})} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:"transparent",border:"none",outline:"none",width:160}} placeholder="Day location..."/>
+        <input value={day.location||""} onChange={e=>onUpdate({...day,location:e.target.value})} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:"transparent",border:"none",outline:"none",width:150}} placeholder="Location..."/>
         <input type="date" value={day.date} onChange={e=>onUpdate({...day,date:e.target.value})} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:"transparent",border:"none",outline:"none",width:130}}/>
         {w&&<div style={{display:"flex",alignItems:"center",gap:4,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"2px 7px",flexShrink:0}}><span style={{fontSize:13}}>{w.icon}</span><div><div style={{fontFamily:F.body,fontSize:9,fontWeight:600,color:C.navy}}>{w.temp}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Rain: {w.rain}</div></div></div>}
+        <button onClick={onDuplicate} title="Duplicate this day" style={{fontFamily:F.body,fontSize:10,color:C.teal,background:"transparent",border:`1px solid ${C.teal}30`,borderRadius:4,padding:"2px 8px",flexShrink:0}}>Copy</button>
         {totalDays>1&&<button onClick={onRemove} style={{fontFamily:F.body,fontSize:10,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:4,padding:"2px 8px"}}>Remove</button>}
       </div>
       {w&&<div style={{background:`${C.teal}08`,borderBottom:`1px solid ${C.grey100}`,padding:"5px 12px",fontFamily:F.serif,fontSize:11,color:C.grey600,fontStyle:"italic"}}>{w.note}</div>}
@@ -469,18 +594,14 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
 function Preview({itinerary,productImages,showInternal,allProducts}){
   const highlights=buildHighlights(itinerary,allProducts);
   const showPrice=itinerary.showPricing;
-
   return(
     <div style={{fontFamily:F.body,color:C.text,maxWidth:860,margin:"0 auto"}}>
-
       {/* Cover */}
       <div style={{background:C.navy,borderRadius:10,padding:"28px 32px",marginBottom:16,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:C.teal,opacity:0.1,borderRadius:"0 0 0 100%"}}/>
         <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:6}}>Coonawarra Experiences</div>
         <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white,lineHeight:1.1,marginBottom:6}}>{itinerary.title||"Private Itinerary"}</div>
         {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.sand,marginBottom:14}}>Prepared for {itinerary.clientName}</div>}
-
-        {/* Key details */}
         <div style={{display:"flex",gap:20,flexWrap:"wrap",marginBottom:14}}>
           {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
           {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
@@ -488,16 +609,12 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
           <div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {itinerary.days.length} {itinerary.days.length===1?"day":"days"}</div>
           {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
         </div>
-
-        {/* Total price */}
         {itinerary.totalPrice&&(
           <div style={{display:"inline-block",background:"rgba(255,255,255,0.1)",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:14}}>
             <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Total investment</div>
             <div style={{fontFamily:F.heading,fontSize:20,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
           </div>
         )}
-
-        {/* Highlights strip */}
         {highlights.length>0&&(
           <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:14,borderTop:`1px solid rgba(255,255,255,0.12)`}}>
             {highlights.map((h,i)=>(
@@ -508,11 +625,10 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
             ))}
           </div>
         )}
-
         <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid rgba(255,255,255,0.1)`,fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.35)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
       </div>
 
-      {/* Intro paragraph */}
+      {/* Intro */}
       {itinerary.intro&&(
         <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
           <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>About this journey</div>
@@ -547,10 +663,9 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
             </div>
             {w&&<div style={{fontFamily:F.serif,fontSize:12,fontStyle:"italic",color:C.grey600,marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${C.sand}`}}>{w.note}</div>}
             {day.dayNotes&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600,marginBottom:14,padding:"10px 12px",background:C.sandLight,borderRadius:6}}>{day.dayNotes}</div>}
-
             {day.items.map(item=>{
               const p=findProduct(allProducts,item.productId);
-              if(!p) return null;
+              if(!p)return null;
               const imgs=productImages[p.id]||[];
               const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
               return(
@@ -562,13 +677,7 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
                         <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy}}>{p.name}</div>
                         {p.location&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:1}}>{p.location}</div>}
                       </div>
-                      {/* Only show individual product price if showPricing is on */}
-                      {showPrice&&(
-                        <div style={{textAlign:"right",flexShrink:0}}>
-                          <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{formatPrice(p.pricing)}</div>
-                          {isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}
-                        </div>
-                      )}
+                      {showPrice&&<div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{formatPrice(p.pricing)}</div>{isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}</div>}
                     </div>
                     <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                       <Badge color={typeColor(p.type)} xs>{p.type==="small_group"?"Small Group":p.type==="component"?"Component":"Private"}</Badge>
@@ -577,11 +686,7 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
                     </div>
                     {p.description&&<p style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.5,marginBottom:8}}>{p.description}</p>}
                     {item.notes&&<div style={{fontFamily:F.body,fontSize:11,fontStyle:"italic",color:C.navy,background:C.sandLight,borderRadius:5,padding:"6px 10px",marginBottom:8}}>Note: {item.notes}</div>}
-                    {showPrice&&isTiered&&p.pricing.tiers?.length>0&&(
-                      <table style={{borderCollapse:"collapse",marginBottom:8}}>
-                        <tbody>{p.pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"1px 12px 1px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody>
-                      </table>
-                    )}
+                    {showPrice&&isTiered&&p.pricing.tiers?.length>0&&<table style={{borderCollapse:"collapse",marginBottom:8}}><tbody>{p.pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"1px 12px 1px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>}
                     {p.inclusions?.length>0&&(
                       <div>
                         <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>Included</div>
@@ -600,11 +705,35 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
         );
       })}
 
-      {/* Terms & Conditions */}
+      {/* Before you arrive */}
+      {itinerary.beforeYouArrive&&(
+        <div className="print-break" style={{marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
+            <span style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>Before You Arrive</span>
+          </div>
+          <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.beforeYouArrive}</div>
+        </div>
+      )}
+
+      {/* Terms */}
       {itinerary.terms&&(
         <div className="print-break" style={{marginBottom:20}}>
           <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>Terms & Conditions</div>
           <div style={{fontFamily:F.body,fontSize:11,color:C.grey600,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{itinerary.terms}</div>
+        </div>
+      )}
+
+      {/* Attachments list */}
+      {itinerary.attachments?.length>0&&(
+        <div style={{marginBottom:20,padding:"14px 16px",background:C.grey100,borderRadius:8}}>
+          <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>Documents attached</div>
+          {itinerary.attachments.map(att=>(
+            <div key={att.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{fontSize:14}}>📄</span>
+              <span style={{fontFamily:F.body,fontSize:12,color:C.navy}}>{att.name}</span>
+              <span style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>({att.size} KB)</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -622,66 +751,67 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
   );
 }
 
-// ─── Email draft builder ──────────────────────────────────────────────────────
-function buildEmailBody(itinerary, allProducts) {
-  const lines = [];
-  lines.push(`Dear ${itinerary.clientName||"there"},`);
+// ─── Email builder ────────────────────────────────────────────────────────────
+function buildEmailBody(itinerary,allProducts){
+  const lines=[];
+  lines.push(`Dear ${itinerary.clientName||"there"},`,"");
+  lines.push("Thank you for your interest in a private journey with Coonawarra Experiences. I'm delighted to share this itinerary for your consideration.");
+  if(itinerary.intro){lines.push("",itinerary.intro);}
   lines.push("");
-  lines.push(`Thank you for your interest in a private journey with Coonawarra Experiences. I'm delighted to share this itinerary for your consideration.`);
-  if(itinerary.intro) { lines.push(""); lines.push(itinerary.intro); }
-  lines.push("");
-  if(itinerary.arrivalDate||itinerary.departureDate) {
-    if(itinerary.arrivalDate) lines.push(`Arrival: ${fmtDate(itinerary.arrivalDate)}`);
-    if(itinerary.departureDate) lines.push(`Departure: ${fmtDate(itinerary.departureDate)}`);
-  }
-  if(itinerary.guestCount) lines.push(`Guests: ${itinerary.guestCount}`);
-  if(itinerary.totalPrice) lines.push(`Investment: ${itinerary.totalPrice}`);
+  if(itinerary.arrivalDate)lines.push(`Arrival: ${fmtDate(itinerary.arrivalDate)}`);
+  if(itinerary.departureDate)lines.push(`Departure: ${fmtDate(itinerary.departureDate)}`);
+  if(itinerary.guestCount)lines.push(`Guests: ${itinerary.guestCount}`);
+  if(itinerary.totalPrice)lines.push(`Investment: ${itinerary.totalPrice}`);
   lines.push("");
   itinerary.days.forEach((day,di)=>{
     lines.push(`DAY ${di+1} — ${day.title}${day.location?` · ${day.location}`:""}`);
-    if(day.dayNotes) lines.push(day.dayNotes);
+    if(day.dayNotes)lines.push(day.dayNotes);
     day.items.forEach(item=>{
       const p=findProduct(allProducts,item.productId);
-      if(p) {
-        lines.push(`  · ${p.name}${p.duration?` (${p.duration})`:""}`);
-        if(item.notes) lines.push(`    ${item.notes}`);
-      }
+      if(p){lines.push(`  · ${p.name}${p.duration?` (${p.duration})`:""}`);if(item.notes)lines.push(`    ${item.notes}`);}
     });
     lines.push("");
   });
-  lines.push("I would love to discuss this itinerary with you and tailor it further to your preferences.");
-  lines.push("");
-  lines.push("Warm regards,");
-  lines.push("Simon & Kerry Meares");
-  lines.push("Coonawarra Experiences");
-  lines.push("1800 861 190 · info@coonawarraexperiences.com.au");
+  lines.push("I would love to discuss this itinerary with you and tailor it further to your preferences.","","Warm regards,","Simon & Kerry Meares","Coonawarra Experiences","1800 861 190 · info@coonawarraexperiences.com.au");
   return lines.join("\n");
 }
 
-function sendEmail(itinerary, allProducts) {
-  const subject = encodeURIComponent(`Your Coonawarra Experiences Itinerary — ${itinerary.title}`);
-  const to = encodeURIComponent(itinerary.clientEmail||"");
-  const body = encodeURIComponent(buildEmailBody(itinerary, allProducts));
-  window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+function sendEmail(itinerary,allProducts){
+  const subject=encodeURIComponent(`Your Coonawarra Experiences Itinerary — ${itinerary.title}`);
+  const to=encodeURIComponent(itinerary.clientEmail||"");
+  const body=encodeURIComponent(buildEmailBody(itinerary,allProducts));
+  window.location.href=`mailto:${to}?subject=${subject}&body=${body}`;
 }
 
 // ─── Status ───────────────────────────────────────────────────────────────────
 const SC={draft:C.grey400,review:C.teal,published:C.terra};
 const SL={draft:"Draft",review:"In Review",published:"Published"};
 
+// ─── Edit tabs ────────────────────────────────────────────────────────────────
+const EDIT_TABS=[
+  {k:"itinerary",l:"Itinerary"},
+  {k:"guest",l:"Guest Info"},
+  {k:"content",l:"Content"},
+  {k:"attachments",l:"Attachments"},
+];
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App(){
-  const [tab,setTab]=useState("builder");
-  const [bView,setBView]=useState("edit");
-  const [showInternal,setSI]=useState(false);
-  const [itineraries,setIts]=useState(()=>loadIts());
-  const [activeId,setActiveId]=useState(null);
-  const [productImages,setPImgs]=useState(()=>loadImgs());
-  const [customProducts,setCPs]=useState(()=>loadCP());
-  const [libCat,setLibCat]=useState("All");
-  const [libSearch,setLibSrch]=useState("");
-  const [showForm,setShowForm]=useState(false);
-  const [editProduct,setEditProduct]=useState(null);
+  const[tab,setTab]=useState("builder");
+  const[bView,setBView]=useState("edit");
+  const[editTab,setEditTab]=useState("itinerary");
+  const[showInternal,setSI]=useState(false);
+  const[itineraries,setIts]=useState(()=>loadIts());
+  const[activeId,setActiveId]=useState(null);
+  const[productImages,setPImgs]=useState(()=>loadImgs());
+  const[customProducts,setCPs]=useState(()=>loadCP());
+  const[templates,setTemplates]=useState(()=>loadTemplates());
+  const[libCat,setLibCat]=useState("All");
+  const[libSearch,setLibSrch]=useState("");
+  const[showForm,setShowForm]=useState(false);
+  const[editProduct,setEditProduct]=useState(null);
+  const[showTemplateManager,setShowTM]=useState(false);
+  const[showSaveTemplate,setShowST]=useState(false);
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
   const active=itineraries.find(i=>i.id===activeId)||null;
@@ -690,25 +820,61 @@ export default function App(){
 
   function handleSaveProduct(product){
     let next;
-    if(editProduct) next=customProducts.map(p=>p.id===product.id?{...product,custom:true}:p);
+    if(editProduct)next=customProducts.map(p=>p.id===product.id?{...product,custom:true}:p);
     else next=[{...product,id:uid(),custom:true},...customProducts];
     setCPs(next);saveCP(next);setShowForm(false);setEditProduct(null);
   }
 
   function handleDeleteProduct(id){
-    if(!confirm("Delete this custom product?")) return;
-    const next=customProducts.filter(p=>p.id!==id);
-    setCPs(next);saveCP(next);
+    if(!confirm("Delete this custom product?"))return;
+    const next=customProducts.filter(p=>p.id!==id);setCPs(next);saveCP(next);
   }
 
-  function mutate(fn){
-    setIts(prev=>{const next=prev.map(i=>i.id===activeId?{...fn(i),updatedAt:new Date().toISOString()}:i);saveIts(next);return next;});
+  // Template operations
+  function handleSaveTemplate(name,description){
+    const template={
+      id:uid(),name,description,savedAt:new Date().toISOString(),
+      days:JSON.parse(JSON.stringify(active.days)),
+      intro:active.intro,hostBio:active.hostBio,
+      beforeYouArrive:active.beforeYouArrive,terms:active.terms,
+      guestCount:active.guestCount,origin:active.origin,
+    };
+    const next=[template,...templates];
+    setTemplates(next);saveTemplates(next);setShowST(false);
   }
 
-  function createNew(){const it=newItinerary();const next=[it,...itineraries];setIts(next);saveIts(next);setActiveId(it.id);setTab("builder");setBView("edit");}
+  function handleDeleteTemplate(id){
+    if(!confirm("Delete this template?"))return;
+    const next=templates.filter(t=>t.id!==id);setTemplates(next);saveTemplates(next);
+  }
+
+  function handleLoadTemplate(template){
+    mutate(it=>({
+      ...it,
+      days:JSON.parse(JSON.stringify(template.days)).map(d=>({...d,id:uid(),items:d.items.map(i=>({...i,id:uid()}))})),
+      intro:template.intro||it.intro,
+      hostBio:template.hostBio||it.hostBio,
+      beforeYouArrive:template.beforeYouArrive||it.beforeYouArrive,
+      terms:template.terms||it.terms,
+    }));
+    setShowTM(false);
+  }
+
+  function mutate(fn){setIts(prev=>{const next=prev.map(i=>i.id===activeId?{...fn(i),updatedAt:new Date().toISOString()}:i);saveIts(next);return next;});}
+
+  function createNew(){const it=newItinerary();const next=[it,...itineraries];setIts(next);saveIts(next);setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");}
   function deleteIt(id){if(!confirm("Delete this itinerary?"))return;const next=itineraries.filter(i=>i.id!==id);setIts(next);saveIts(next);if(activeId===id)setActiveId(null);}
   function dupIt(it){const c={...JSON.parse(JSON.stringify(it)),id:uid(),title:it.title+" (copy)",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};const next=[c,...itineraries];setIts(next);saveIts(next);setActiveId(c.id);setTab("builder");setBView("edit");}
-  function addDay(){mutate(it=>({...it,days:[...it.days,{id:uid(),title:`Day ${it.days.length+1}`,date:"",location:"",items:[],dayNotes:""}]}));}
+  function addDay(){mutate(it=>({...it,days:[...it.days,newDay(it.days.length+1)]}));}
+  function duplicateDay(dayId){
+    mutate(it=>{
+      const idx=it.days.findIndex(d=>d.id===dayId);
+      if(idx<0)return it;
+      const copy={...JSON.parse(JSON.stringify(it.days[idx])),id:uid(),items:it.days[idx].items.map(i=>({...i,id:uid()}))};
+      const days=[...it.days];days.splice(idx+1,0,copy);
+      return{...it,days};
+    });
+  }
   function removeDay(dayId){mutate(it=>({...it,days:it.days.filter(d=>d.id!==dayId)}));}
   function updateDay(d){mutate(it=>({...it,days:it.days.map(x=>x.id===d.id?d:x)}));}
   function addItem(dayId,product){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:[...d.items,{id:uid(),productId:product.id,notes:""}]}:d)}));}
@@ -727,6 +893,10 @@ export default function App(){
   return(
     <div style={{minHeight:"100vh",background:C.offWhite}}>
       <style>{CSS}</style>
+
+      {/* Modals */}
+      {showTemplateManager&&<TemplateManager templates={templates} onLoad={handleLoadTemplate} onDelete={handleDeleteTemplate} onClose={()=>setShowTM(false)}/>}
+      {showSaveTemplate&&active&&<SaveTemplateModal itinerary={active} onSave={handleSaveTemplate} onClose={()=>setShowST(false)}/>}
 
       {/* Header */}
       <header className="no-print" style={{background:C.navy,position:"sticky",top:0,zIndex:200,boxShadow:"0 2px 12px rgba(25,41,87,0.2)"}}>
@@ -753,6 +923,12 @@ export default function App(){
             </div>
           )}
           <div style={{flex:1}}/>
+          {/* Templates */}
+          <button onClick={()=>setShowTM(true)} style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.08)",border:`1px solid rgba(255,255,255,0.15)`,borderRadius:5,padding:"5px 11px"}}>📋 Templates</button>
+          {tab==="builder"&&active&&bView==="edit"&&(
+            <button onClick={()=>setShowST(true)} style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.08)",border:`1px solid rgba(255,255,255,0.15)`,borderRadius:5,padding:"5px 11px"}}>Save as template</button>
+          )}
+          {/* Internal toggle */}
           <div onClick={()=>setSI(v=>!v)} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",background:"rgba(255,255,255,0.06)",borderRadius:5,border:`1px solid rgba(255,255,255,0.1)`,cursor:"pointer"}}>
             <div style={{width:26,height:14,borderRadius:7,background:showInternal?C.teal:"rgba(255,255,255,0.18)",position:"relative",transition:"background 0.2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:showInternal?12:2,width:10,height:10,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/></div>
             <span style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.65)",userSelect:"none"}}>Internal</span>
@@ -799,7 +975,7 @@ export default function App(){
                 </div>
               </div>
               <div style={{display:"flex",gap:5,flexShrink:0}}>
-                <button onClick={()=>{setActiveId(it.id);setTab("builder");setBView("edit");}} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"5px 12px"}}>Open</button>
+                <button onClick={()=>{setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");}} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"5px 12px"}}>Open</button>
                 <button onClick={()=>dupIt(it)} style={{fontFamily:F.body,fontSize:11,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 10px"}}>Copy</button>
                 <button onClick={()=>deleteIt(it.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"5px 10px"}}>Delete</button>
               </div>
@@ -808,7 +984,7 @@ export default function App(){
         </div>
       )}
 
-      {/* Builder */}
+      {/* Builder tab */}
       {tab==="builder"&&(
         !active?(
           <div style={{textAlign:"center",padding:"70px 20px"}}>
@@ -817,6 +993,7 @@ export default function App(){
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={createNew} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:6,padding:"9px 22px"}}>+ New Itinerary</button>
               <button onClick={()=>setTab("saved")} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"9px 22px"}}>Open Saved</button>
+              <button onClick={()=>setShowTM(true)} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"9px 22px"}}>📋 Use Template</button>
             </div>
           </div>
         ):bView==="preview"?(
@@ -825,7 +1002,6 @@ export default function App(){
           </div>
         ):(
           <div className="no-print" style={{display:"grid",gridTemplateColumns:"300px 1fr",height:"calc(100vh - 84px)",overflow:"hidden"}}>
-
             {/* Library */}
             <div style={{background:C.white,borderRight:`1px solid ${C.grey200}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
               <div style={{padding:"10px 12px",borderBottom:`1px solid ${C.grey200}`,background:C.grey100}}>
@@ -847,7 +1023,7 @@ export default function App(){
                 {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
                 {filtered.map(p=>(
                   <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} showInternal={showInternal}
-                    onAdd={product=>{if(active?.days?.length>0) addItem(active.days[active.days.length-1].id,product);}}
+                    onAdd={product=>{if(active?.days?.length>0)addItem(active.days[active.days.length-1].id,product);}}
                     onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
                     onDelete={()=>handleDeleteProduct(p.id)}
                   />
@@ -855,7 +1031,7 @@ export default function App(){
               </div>
             </div>
 
-            {/* Builder right panel */}
+            {/* Right panel */}
             <div style={{display:"flex",flexDirection:"column",overflow:"hidden"}}>
               {/* Meta bar */}
               <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"8px 14px"}}>
@@ -872,18 +1048,18 @@ export default function App(){
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Arrival</span>
-                    <input type="date" value={active.arrivalDate||""} onChange={e=>mutate(it=>({...it,arrivalDate:e.target.value}))} style={{...fi}}/>
+                    <input type="date" value={active.arrivalDate||""} onChange={e=>mutate(it=>({...it,arrivalDate:e.target.value}))} style={fi}/>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Departure</span>
-                    <input type="date" value={active.departureDate||""} onChange={e=>mutate(it=>({...it,departureDate:e.target.value}))} style={{...fi}}/>
+                    <input type="date" value={active.departureDate||""} onChange={e=>mutate(it=>({...it,departureDate:e.target.value}))} style={fi}/>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total price</span>
                     <input value={active.totalPrice||""} onChange={e=>mutate(it=>({...it,totalPrice:e.target.value}))} placeholder="e.g. From $3,975 per couple" style={{...fi,width:220}}/>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
-                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show item pricing in output</span>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show item pricing</span>
                     <div onClick={()=>mutate(it=>({...it,showPricing:!it.showPricing}))} style={{width:32,height:17,borderRadius:9,background:active.showPricing?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
                       <div style={{position:"absolute",top:2,left:active.showPricing?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
                     </div>
@@ -891,40 +1067,72 @@ export default function App(){
                 </div>
               </div>
 
-              {/* Days scroll */}
-              <div style={{flex:1,overflowY:"auto",padding:"14px 14px 28px"}}>
-                {active.days.map((day,di)=>(
-                  <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
-                    productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
-                    onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem}
-                    onNoteChange={updateNote} onRemove={()=>removeDay(day.id)}
-                  />
+              {/* Edit sub-tabs */}
+              <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"0 14px",display:"flex",gap:2}}>
+                {EDIT_TABS.map(({k,l})=>(
+                  <button key={k} onClick={()=>setEditTab(k)} style={{fontFamily:F.body,fontSize:12,fontWeight:editTab===k?600:400,color:editTab===k?C.navy:C.grey400,background:"transparent",border:"none",borderBottom:editTab===k?`2px solid ${C.terra}`:"2px solid transparent",padding:"8px 14px",marginBottom:-1}}>
+                    {l}{k==="guest"&&active.guestInfo?.name1?" ✓":""}
+                    {k==="attachments"&&active.attachments?.length>0?` (${active.attachments.length})`:""}
+                  </button>
                 ))}
-                <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
+              </div>
 
-                {/* Intro */}
-                <div style={{marginTop:18,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:14}}>
-                  <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>Introduction / journey overview</div>
-                  <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for the itinerary — what makes this journey special, the tone you want to set. Appears between the cover and Day 1." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
-                </div>
+              {/* Edit content */}
+              <div style={{flex:1,overflowY:"auto",padding:"14px 14px 28px"}}>
 
-                {/* Host bio */}
-                <div style={{marginTop:12,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:14}}>
-                  <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>Host introduction (Simon & Kerry)</div>
-                  <textarea value={active.hostBio||""} onChange={e=>mutate(it=>({...it,hostBio:e.target.value}))} placeholder="A short introduction to Simon and Kerry as hosts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none"}}/>
-                </div>
+                {/* Itinerary tab */}
+                {editTab==="itinerary"&&(
+                  <>
+                    {active.days.map((day,di)=>(
+                      <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
+                        productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
+                        onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem}
+                        onNoteChange={updateNote} onRemove={()=>removeDay(day.id)}
+                        onDuplicate={()=>duplicateDay(day.id)}
+                      />
+                    ))}
+                    <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
+                  </>
+                )}
 
-                {/* Terms */}
-                <div style={{marginTop:12,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:14}}>
-                  <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>Terms & Conditions</div>
-                  <textarea value={active.terms||""} onChange={e=>mutate(it=>({...it,terms:e.target.value}))} placeholder="Terms and conditions. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:120,outline:"none"}}/>
-                </div>
+                {/* Guest info tab */}
+                {editTab==="guest"&&(
+                  <SectionBox title="Guest Information (internal only)">
+                    <GuestInfoForm guestInfo={active.guestInfo} onChange={gi=>mutate(it=>({...it,guestInfo:gi}))}/>
+                  </SectionBox>
+                )}
 
-                {/* Footer notes */}
-                <div style={{marginTop:12,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:14}}>
-                  <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>Footer note (optional)</div>
-                  <textarea value={active.notes||""} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Any additional note to appear in the footer..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:48,outline:"none"}}/>
-                </div>
+                {/* Content tab */}
+                {editTab==="content"&&(
+                  <>
+                    <SectionBox title="Introduction / Journey Overview">
+                      <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for the itinerary — what makes this journey special, the tone you want to set. Appears between the cover and Day 1." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:90,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Host Introduction (Simon & Kerry)">
+                      <textarea value={active.hostBio||""} onChange={e=>mutate(it=>({...it,hostBio:e.target.value}))} placeholder="A short introduction to Simon and Kerry as hosts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Before You Arrive">
+                      <textarea value={active.beforeYouArrive||""} onChange={e=>mutate(it=>({...it,beforeYouArrive:e.target.value}))} placeholder="Practical information for guests — getting here, what to pack, mobile coverage, dining notes, emergency contacts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:160,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Terms & Conditions">
+                      <textarea value={active.terms||""} onChange={e=>mutate(it=>({...it,terms:e.target.value}))} placeholder="Terms and conditions. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Footer Note (optional)">
+                      <textarea value={active.notes||""} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Any additional note to appear in the itinerary footer..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:48,outline:"none"}}/>
+                    </SectionBox>
+                  </>
+                )}
+
+                {/* Attachments tab */}
+                {editTab==="attachments"&&(
+                  <SectionBox title="Document Attachments">
+                    <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,marginBottom:12,lineHeight:1.5}}>
+                      Attach PDFs to this itinerary — rate sheets, partner information packs, the See South Australia Collective dossier, wine region maps. Attachments are listed in the itinerary footer and stored in the browser.
+                    </div>
+                    <AttachmentManager attachments={active.attachments} onUpdate={atts=>mutate(it=>({...it,attachments:atts}))}/>
+                  </SectionBox>
+                )}
+
               </div>
             </div>
           </div>
