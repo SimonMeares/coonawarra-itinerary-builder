@@ -317,6 +317,7 @@ function ImageUploader({productId,images,onImagesChange}){
   const[dragging,setDragging]=useState(false);
   const[uploading,setUploading]=useState(false);
   const[error,setError]=useState(null);
+  const[dragIdx,setDragIdx]=useState(null);
   async function handleFiles(files){
     const imageFiles=Array.from(files).filter(f=>f.type.startsWith("image/"));
     if(!imageFiles.length)return;
@@ -328,13 +329,29 @@ function ImageUploader({productId,images,onImagesChange}){
   const imgs=images||[];
   return(
     <div style={{marginTop:6}}>
-      {imgs.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>{imgs.map((src,i)=><div key={i} className="img-thumb" style={{width:52,height:40}}><img src={src} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:`1px solid ${C.grey200}`}} crossOrigin="anonymous"/><button className="img-thumb-del" onClick={()=>onImagesChange(productId,imgs.filter((_,j)=>j!==i))}>×</button></div>)}</div>}
+      {imgs.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+          {imgs.map((src,i)=>(
+            <div key={src} className="img-thumb" style={{width:52,height:40,cursor:"grab",opacity:dragIdx===i?0.4:1,outline:dragIdx!==null&&dragIdx!==i?`2px solid ${C.teal}`:"none",borderRadius:4}}
+              draggable
+              onDragStart={()=>setDragIdx(i)}
+              onDragOver={e=>{e.preventDefault();}}
+              onDrop={e=>{e.preventDefault();if(dragIdx===null||dragIdx===i)return;const next=[...imgs];const[moved]=next.splice(dragIdx,1);next.splice(i,0,moved);onImagesChange(productId,next);setDragIdx(null);}}
+              onDragEnd={()=>setDragIdx(null)}
+            >
+              <img src={src} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:`1px solid ${C.grey200}`,pointerEvents:"none"}} crossOrigin="anonymous"/>
+              <button className="img-thumb-del" onClick={()=>onImagesChange(productId,imgs.filter((_,j)=>j!==i))}>×</button>
+              {i===0&&<div style={{position:"absolute",bottom:2,left:2,background:C.teal,borderRadius:2,padding:"1px 3px",fontFamily:F.body,fontSize:7,fontWeight:700,color:C.white,letterSpacing:"0.04em",lineHeight:1}}>HERO</div>}
+            </div>
+          ))}
+        </div>
+      )}
       <div className={`img-drop-zone${dragging?" drag-over":""}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);handleFiles(e.dataTransfer.files);}} onClick={()=>!uploading&&inputRef.current.click()}>
         <div style={{fontFamily:F.body,fontSize:10,color:uploading?C.teal:C.grey400}}>{uploading?<><span style={{fontSize:14}}>⏳</span><br/>Uploading to Cloudinary...</>:imgs.length===0?<><span style={{fontSize:14}}>📷</span><br/>Drop images or click to upload</>:<span>+ Add more images</span>}</div>
         <input ref={inputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
       </div>
       {error&&<div style={{fontFamily:F.body,fontSize:10,color:C.terra,marginTop:3}}>{error}</div>}
-      {imgs.length>0&&!uploading&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:2,textAlign:"center"}}>{imgs.length} image{imgs.length!==1?"s":""} · Hosted on Cloudinary · First used as hero</div>}
+      {imgs.length>0&&!uploading&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:2,textAlign:"center"}}>{imgs.length} image{imgs.length!==1?"s":""} · Drag thumbnails to reorder · First is hero</div>}
     </div>
   );
 }
