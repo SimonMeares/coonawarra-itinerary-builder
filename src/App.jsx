@@ -121,6 +121,21 @@ function formatPrice(pricing){
 
 function typeColor(type){return type==="private"?C.navy:type==="small_group"?C.teal:C.grey400;}
 
+function netPrice(pricing, commPct){
+  const{structure,tiers}=pricing;
+  if(!tiers||!tiers.length)return null;
+  const disc=1-(commPct/100);
+  if(structure==="per_adult"||structure==="per_couple"){
+    const net=Math.round(tiers[0].retail*disc);
+    return{single:net, label:structure==="per_couple"?"per couple":"per adult"};
+  }
+  if(structure==="tiered_per_person_by_group"||structure==="tiered_per_couple_by_group"){
+    const unit=structure==="tiered_per_couple_by_group"?"per couple":"per person";
+    return{tiered:tiers.map(t=>({...t,net:Math.round(t.retail*disc)})),label:unit};
+  }
+  return null;
+}
+
 function buildHighlights(itinerary,allProducts){
   const items=itinerary.days.flatMap(d=>d.items);
   const seen=new Set();
@@ -152,7 +167,7 @@ function newItinerary(){
   return{
     id:uid(),title:"New Itinerary",clientName:"",clientEmail:"",
     guestCount:2,arrivalDate:"",departureDate:"",origin:"Melbourne",
-    status:"draft",totalPrice:"",showPricing:false,
+    status:"draft",totalPrice:"",showPricing:false,tradeMode:false,commission:20,
     intro:"",hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they've built with the region's people, places and producers.",
     beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
     terms:DEFAULT_TERMS,notes:"",
@@ -558,7 +573,7 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
 }
 
 // ─── Day card ─────────────────────────────────────────────────────────────────
-function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onRemove,onDuplicate}){
+function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onRemove,onDuplicate,onMoveDay,isFirstDay,isLastDay}){
   const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
   return(
     <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden",marginBottom:14}}>
@@ -568,6 +583,8 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
         <input value={day.location||""} onChange={e=>onUpdate({...day,location:e.target.value})} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:"transparent",border:"none",outline:"none",width:150}} placeholder="Location..."/>
         <input type="date" value={day.date} onChange={e=>onUpdate({...day,date:e.target.value})} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:"transparent",border:"none",outline:"none",width:130}}/>
         {w&&<div style={{display:"flex",alignItems:"center",gap:4,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"2px 7px",flexShrink:0}}><span style={{fontSize:13}}>{w.icon}</span><div><div style={{fontFamily:F.body,fontSize:9,fontWeight:600,color:C.navy}}>{w.temp}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Rain: {w.rain}</div></div></div>}
+        {!isFirstDay&&<button onClick={()=>onMoveDay(-1)} title="Move day up" style={{fontFamily:F.body,fontSize:11,fontWeight:700,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"1px 7px",flexShrink:0}}>↑</button>}
+        {!isLastDay&&<button onClick={()=>onMoveDay(1)} title="Move day down" style={{fontFamily:F.body,fontSize:11,fontWeight:700,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"1px 7px",flexShrink:0}}>↓</button>}
         <button onClick={onDuplicate} title="Duplicate this day" style={{fontFamily:F.body,fontSize:10,color:C.teal,background:"transparent",border:`1px solid ${C.teal}30`,borderRadius:4,padding:"2px 8px",flexShrink:0}}>Copy</button>
         {totalDays>1&&<button onClick={onRemove} style={{fontFamily:F.body,fontSize:10,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:4,padding:"2px 8px"}}>Remove</button>}
       </div>
@@ -592,6 +609,8 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
 function Preview({itinerary,productImages,showInternal,allProducts}){
+  const isTrade=itinerary.tradeMode||false;
+  const comm=itinerary.commission||20;
   const highlights=buildHighlights(itinerary,allProducts);
   const showPrice=itinerary.showPricing;
   return(
@@ -601,7 +620,8 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
         <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:C.teal,opacity:0.1,borderRadius:"0 0 0 100%"}}/>
         <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:6}}>Coonawarra Experiences</div>
         <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white,lineHeight:1.1,marginBottom:6}}>{itinerary.title||"Private Itinerary"}</div>
-        {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.sand,marginBottom:14}}>Prepared for {itinerary.clientName}</div>}
+        {isTrade&&<div style={{display:"inline-block",background:C.terra,borderRadius:5,padding:"2px 10px",marginBottom:10,fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,letterSpacing:"0.1em",textTransform:"uppercase"}}>Trade Partner Rate Sheet · {comm}% Commission</div>}
+        {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.sand,marginBottom:14}}>{isTrade?"Prepared for trade partner:":"Prepared for"} {itinerary.clientName}</div>}
         <div style={{display:"flex",gap:20,flexWrap:"wrap",marginBottom:14}}>
           {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
           {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
@@ -611,7 +631,7 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
         </div>
         {itinerary.totalPrice&&(
           <div style={{display:"inline-block",background:"rgba(255,255,255,0.1)",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:14}}>
-            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Total investment</div>
+            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{isTrade?"Total (net rates)":"Total investment"}</div>
             <div style={{fontFamily:F.heading,fontSize:20,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
           </div>
         )}
@@ -677,7 +697,18 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
                         <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy}}>{p.name}</div>
                         {p.location&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:1}}>{p.location}</div>}
                       </div>
-                      {showPrice&&<div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{formatPrice(p.pricing)}</div>{isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}</div>}
+                      {showPrice&&(
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          {isTrade?(()=>{
+                            const n=netPrice(p.pricing,comm);
+                            if(!n)return<div style={{fontFamily:F.heading,fontSize:12,color:C.terra}}>POA</div>;
+                            if(n.tiered)return<div>{n.tiered.map((t,i)=><div key={i} style={{fontFamily:F.body,fontSize:11,color:C.grey600}}>{t.label}: <span style={{fontFamily:F.heading,fontWeight:700,color:C.terra}}>${t.net.toLocaleString()}</span></div>)}<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,marginTop:1}}>Net {comm}% · {n.label}</div></div>;
+                            return<div><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>${n.single.toLocaleString()}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Net {comm}% · {n.label}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>RRP {formatPrice(p.pricing)}</div></div>;
+                          })():(
+                            <><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{formatPrice(p.pricing)}</div>{isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}</>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
                       <Badge color={typeColor(p.type)} xs>{p.type==="small_group"?"Small Group":p.type==="component"?"Component":"Private"}</Badge>
@@ -751,6 +782,137 @@ function Preview({itinerary,productImages,showInternal,allProducts}){
   );
 }
 
+// ─── Offline HTML generator ───────────────────────────────────────────────────
+function generateOfflineHTML(itinerary, allProducts, productImages) {
+  // Build a self-contained HTML snapshot of the preview
+  const fmtD = d => {if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});};
+  const fmtDS = d => {if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"});};
+  const WEATHER_DATA = {1:{month:"January",temp:"20–34°C",rain:"Low",icon:"☀️",note:"Peak summer. Hot days, long light evenings."},2:{month:"February",temp:"20–33°C",rain:"Low",icon:"☀️",note:"Still hot. Vintage begins in Coonawarra."},3:{month:"March",temp:"16–28°C",rain:"Low",icon:"🌤️",note:"Vintage season. Warm days, cooler evenings."},4:{month:"April",temp:"12–22°C",rain:"Medium",icon:"🌤️",note:"Autumn colours in the vineyard. Cool nights."},5:{month:"May",temp:"9–18°C",rain:"Medium",icon:"🌥️",note:"Shoulder season. Quieter, good value."},6:{month:"June",temp:"6–14°C",rain:"High",icon:"🌧️",note:"Winter. Fires in the cellar doors."},7:{month:"July",temp:"5–13°C",rain:"High",icon:"🌧️",note:"Coldest month. Warm layers recommended."},8:{month:"August",temp:"6–14°C",rain:"High",icon:"🌧️",note:"Winter wrapping up. Wildlife active at dusk."},9:{month:"September",temp:"8–17°C",rain:"Medium",icon:"🌤️",note:"Spring. Vines budding. Wildflowers along the coast."},10:{month:"October",temp:"11–21°C",rain:"Low",icon:"🌤️",note:"Perfect touring weather. Peak season begins."},11:{month:"November",temp:"13–25°C",rain:"Low",icon:"☀️",note:"Warm and sunny. Book ahead."},12:{month:"December",temp:"16–28°C",rain:"Low",icon:"☀️",note:"Summer holidays. Festive atmosphere."}};
+
+  let body = "";
+
+  // Cover
+  body += `<div class="cover">
+    <div class="cover-label">Coonawarra Experiences</div>
+    <h1>${itinerary.title||"Private Itinerary"}</h1>
+    ${itinerary.clientName?`<p class="serif italic sand">Prepared for ${itinerary.clientName}</p>`:""}
+    <div class="cover-meta">
+      ${itinerary.arrivalDate?`<span><b>Arrival</b> · ${fmtD(itinerary.arrivalDate)}</span>`:""}
+      ${itinerary.departureDate?`<span><b>Departure</b> · ${fmtD(itinerary.departureDate)}</span>`:""}
+      ${itinerary.guestCount?`<span><b>Guests</b> · ${itinerary.guestCount}</span>`:""}
+      <span><b>Duration</b> · ${itinerary.days.length} day${itinerary.days.length===1?"":"s"}</span>
+      ${itinerary.origin?`<span><b>Origin</b> · ${itinerary.origin}</span>`:""}
+    </div>
+    ${itinerary.totalPrice?`<div class="price-box"><div class="price-label">Total investment</div><div class="price-val">${itinerary.totalPrice}</div></div>`:""}
+    <div class="season-note">Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+  </div>`;
+
+  // Intro
+  if(itinerary.intro) body += `<div class="section teal-border"><div class="eyebrow teal">About this journey</div><p class="serif large">${itinerary.intro}</p></div>`;
+
+  // Host bio
+  if(itinerary.hostBio) body += `<div class="section sand-bg"><div class="host-avatar">SK</div><div><div class="eyebrow navy">Your hosts · Simon & Kerry Meares</div><p>${itinerary.hostBio}</p></div></div>`;
+
+  // Days
+  itinerary.days.forEach((day,di)=>{
+    const w = day.date ? WEATHER_DATA[new Date(day.date).getMonth()+1] : null;
+    body += `<div class="page-break"><div class="day-header"><span class="day-num">DAY ${di+1}</span><div><div class="day-title">${day.title}</div>${day.location?`<div class="day-loc">${day.location}</div>`:""}</div>${day.date?`<span class="day-date">${fmtDS(day.date)}</span>`:""}</div>`;
+    if(w) body += `<div class="weather-note">${w.icon} ${w.note}</div>`;
+    if(day.dayNotes) body += `<div class="day-notes">${day.dayNotes}</div>`;
+    day.items.forEach(item=>{
+      const p = allProducts.find(x=>x.id===item.productId);
+      if(!p) return;
+      const imgs = productImages[p.id]||[];
+      body += `<div class="experience">`;
+      if(imgs.length){body += `<div class="img-strip"><img src="${imgs[0]}" alt="${p.name}" style="width:100%;height:160px;object-fit:cover;display:block;border-radius:6px 6px 0 0"></div>`;}
+      body += `<div class="exp-body"><div class="exp-title">${p.name}</div>`;
+      if(p.location) body += `<div class="exp-loc">${p.location}</div>`;
+      if(p.description) body += `<p class="exp-desc">${p.description}</p>`;
+      if(item.notes) body += `<div class="note-box">Note: ${item.notes}</div>`;
+      if(p.inclusions?.length) body += `<div class="inc-label">Included</div><ul class="inc-list">${p.inclusions.map(i=>`<li>${i}</li>`).join("")}</ul>`;
+      body += `</div></div>`;
+    });
+    body += `</div>`;
+  });
+
+  // Before you arrive
+  if(itinerary.beforeYouArrive) body += `<div class="page-break"><h2 class="section-title">Before You Arrive</h2><div class="body-text pre">${itinerary.beforeYouArrive}</div></div>`;
+
+  // Terms
+  if(itinerary.terms) body += `<div class="page-break"><h2 class="section-title">Terms & Conditions</h2><div class="body-text small pre">${itinerary.terms}</div></div>`;
+
+  // Attachments
+  if(itinerary.attachments?.length){
+    body += `<div class="attachments"><div class="eyebrow">Documents attached to this itinerary</div>`;
+    itinerary.attachments.forEach(att=>{
+      body += `<div class="att-item"><a href="${att.data}" download="${att.name}" class="att-link">📄 ${att.name} <span class="att-size">(${att.size} KB)</span></a></div>`;
+    });
+    body += `</div>`;
+  }
+
+  // Footer
+  body += `<div class="footer"><p class="serif italic">"Hosted journeys of wine country and beyond."</p><div class="footer-contacts"><span><b>Phone</b> 1800 861 190</span><span><b>Email</b> info@coonawarraexperiences.com.au</span><span><b>Web</b> coonawarraexperiences.com.au</span></div></div>`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${itinerary.title||"Itinerary"} — ${itinerary.clientName||"Coonawarra Experiences"}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#faf9f6;color:#1a1917;max-width:860px;margin:0 auto;padding:20px;}
+h1{font-family:Arial Black,sans-serif;font-size:28px;color:white;line-height:1.1;margin-bottom:6px;}
+h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #d8c69d;}
+.cover{background:#192957;border-radius:10px;padding:28px 32px;margin-bottom:16px;color:white;}
+.cover-label{font-size:9px;color:#d8c69d;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px;}
+.sand{color:#d8c69d!important;}
+.italic{font-style:italic;}
+.serif{font-family:Georgia,serif;}
+.large{font-size:14px;line-height:1.75;}
+.cover-meta{display:flex;gap:20px;flex-wrap:wrap;margin:14px 0;font-size:11px;color:rgba(255,255,255,.7);}
+.cover-meta b{color:#d8c69d;}
+.price-box{display:inline-block;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 16px;margin-bottom:14px;}
+.price-label{font-size:9px;color:#d8c69d;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px;}
+.price-val{font-family:Arial Black,sans-serif;font-size:20px;font-weight:700;color:white;}
+.season-note{font-size:9px;color:rgba(255,255,255,.35);margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);}
+.section{background:white;border:1px solid #e8e6e0;border-radius:10px;padding:18px 22px;margin-bottom:16px;}
+.teal-border{border-left:4px solid #40c0c0;}
+.sand-bg{background:#f0ead8;display:flex;gap:16px;align-items:flex-start;}
+.host-avatar{width:44px;height:44px;border-radius:50%;background:#192957;color:#d8c69d;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;}
+.eyebrow{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
+.teal{color:#40c0c0;}
+.navy{color:#192957;}
+.page-break{margin-bottom:20px;page-break-before:auto;}
+.day-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #d8c69d;}
+.day-num{font-size:9px;font-weight:700;color:#d34727;letter-spacing:.1em;text-transform:uppercase;flex-shrink:0;}
+.day-title{font-family:Arial Black,sans-serif;font-size:18px;font-weight:700;color:#192957;}
+.day-loc{font-size:11px;color:#9e9b92;margin-top:1px;}
+.day-date{font-size:11px;color:#9e9b92;margin-left:auto;flex-shrink:0;}
+.weather-note{font-family:Georgia,serif;font-style:italic;font-size:12px;color:#5c5a54;margin-bottom:12px;padding-left:10px;border-left:2px solid #d8c69d;}
+.day-notes{font-size:12px;color:#5c5a54;margin-bottom:14px;padding:10px 12px;background:#f0ead8;border-radius:6px;}
+.experience{background:white;border:1px solid #e8e6e0;border-radius:8px;overflow:hidden;margin-bottom:10px;border-left:4px solid #192957;}
+.exp-body{padding:12px 14px;}
+.exp-title{font-family:Arial Black,sans-serif;font-size:14px;font-weight:700;color:#192957;margin-bottom:2px;}
+.exp-loc{font-size:11px;color:#9e9b92;margin-bottom:6px;}
+.exp-desc{font-size:12px;color:#5c5a54;line-height:1.5;margin-bottom:8px;}
+.note-box{font-size:11px;font-style:italic;color:#192957;background:#f0ead8;border-radius:5px;padding:6px 10px;margin-bottom:8px;}
+.inc-label{font-size:9px;font-weight:700;color:#9e9b92;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+.inc-list{list-style:none;padding:0;columns:2;gap:12px;}
+.inc-list li{font-size:11px;color:#5c5a54;padding-left:10px;position:relative;margin-bottom:2px;}
+.inc-list li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:1px;background:#40c0c0;}
+.body-text{font-size:12px;color:#5c5a54;line-height:1.7;}
+.body-text.small{font-size:11px;}
+.pre{white-space:pre-wrap;}
+.attachments{margin-bottom:20px;padding:14px 16px;background:#f4f3f0;border-radius:8px;}
+.att-item{margin-bottom:4px;}
+.att-link{color:#192957;text-decoration:none;font-size:12px;}
+.att-link:hover{text-decoration:underline;}
+.att-size{color:#9e9b92;font-size:10px;}
+.footer{background:#192957;border-radius:10px;padding:18px 24px;margin-top:20px;}
+.footer p{color:#d8c69d;margin-bottom:10px;}
+.footer-contacts{display:flex;gap:20px;flex-wrap:wrap;font-size:11px;color:rgba(255,255,255,.6);}
+.footer-contacts b{color:#d8c69d;}
+@media(max-width:600px){.cover-meta,.footer-contacts{flex-direction:column;gap:8px;}.inc-list{columns:1;}}
+@media print{body{max-width:none;padding:0;}.page-break{page-break-before:always;}@page{margin:12mm;}}
+</style></head><body>${body}</body></html>`;
+}
+
 // ─── Email builder ────────────────────────────────────────────────────────────
 function buildEmailBody(itinerary,allProducts){
   const lines=[];
@@ -812,6 +974,7 @@ export default function App(){
   const[editProduct,setEditProduct]=useState(null);
   const[showTemplateManager,setShowTM]=useState(false);
   const[showSaveTemplate,setShowST]=useState(false);
+  const[dayPicker,setDayPicker]=useState(null); // {product} when open
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
   const active=itineraries.find(i=>i.id===activeId)||null;
@@ -897,6 +1060,20 @@ export default function App(){
       {/* Modals */}
       {showTemplateManager&&<TemplateManager templates={templates} onLoad={handleLoadTemplate} onDelete={handleDeleteTemplate} onClose={()=>setShowTM(false)}/>}
       {showSaveTemplate&&active&&<SaveTemplateModal itinerary={active} onSave={handleSaveTemplate} onClose={()=>setShowST(false)}/>}
+      {dayPicker&&active&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDayPicker(null)}>
+          <div style={{background:C.white,borderRadius:10,padding:20,minWidth:300,boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:4}}>Add to which day?</div>
+            <div style={{fontFamily:F.body,fontSize:12,color:C.grey400,marginBottom:12}}>{dayPicker.product.name}</div>
+            {active.days.map((day,di)=>(
+              <button key={day.id} onClick={()=>{addItem(day.id,dayPicker.product);setDayPicker(null);}} style={{display:"block",width:"100%",textAlign:"left",fontFamily:F.body,fontSize:13,color:C.navy,background:C.grey100,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",marginBottom:5,cursor:"pointer"}}>
+                <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,textTransform:"uppercase",letterSpacing:"0.08em",marginRight:8}}>Day {di+1}</span>{day.title}
+              </button>
+            ))}
+            <button onClick={()=>setDayPicker(null)} style={{marginTop:4,fontFamily:F.body,fontSize:12,color:C.grey400,background:"transparent",border:"none",width:"100%",padding:"6px 0"}}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <header className="no-print" style={{background:C.navy,position:"sticky",top:0,zIndex:200,boxShadow:"0 2px 12px rgba(25,41,87,0.2)"}}>
@@ -938,6 +1115,14 @@ export default function App(){
             <>
               <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
               <button onClick={()=>sendEmail(active,allProducts)} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"6px 12px"}}>Email Draft</button>
+              <button onClick={()=>{
+                const html=generateOfflineHTML(active,allProducts,productImages);
+                const blob=new Blob([html],{type:"text/html"});
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement("a");
+                a.href=url;a.download=`${(active.clientName||"Itinerary").replace(/[^a-z0-9]/gi,"_")}_${active.title.replace(/[^a-z0-9]/gi,"_")}.html`;
+                a.click();URL.revokeObjectURL(url);
+              }} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:"#5c5a54",border:"none",borderRadius:5,padding:"6px 12px"}}>↓ Offline</button>
             </>
           )}
         </div>
@@ -1023,7 +1208,11 @@ export default function App(){
                 {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
                 {filtered.map(p=>(
                   <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} showInternal={showInternal}
-                    onAdd={product=>{if(active?.days?.length>0)addItem(active.days[active.days.length-1].id,product);}}
+                    onAdd={product=>{
+                      if(!active?.days?.length)return;
+                      if(active.days.length===1){addItem(active.days[0].id,product);}
+                      else{setDayPicker({product});}
+                    }}
                     onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
                     onDelete={()=>handleDeleteProduct(p.id)}
                   />
@@ -1063,6 +1252,15 @@ export default function App(){
                     <div onClick={()=>mutate(it=>({...it,showPricing:!it.showPricing}))} style={{width:32,height:17,borderRadius:9,background:active.showPricing?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
                       <div style={{position:"absolute",top:2,left:active.showPricing?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
                     </div>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginLeft:8}}>Trade mode</span>
+                    <div onClick={()=>mutate(it=>({...it,tradeMode:!it.tradeMode,showPricing:!it.tradeMode}))} style={{width:32,height:17,borderRadius:9,background:active.tradeMode?C.terra:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                      <div style={{position:"absolute",top:2,left:active.tradeMode?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                    </div>
+                    {active.tradeMode&&(
+                      <select value={active.commission||20} onChange={e=>mutate(it=>({...it,commission:parseInt(e.target.value)}))} style={{fontFamily:F.body,fontSize:11,color:C.terra,fontWeight:700,border:`1px solid ${C.terra}40`,borderRadius:5,padding:"3px 6px",outline:"none",background:C.white}}>
+                        {[10,15,20,25].map(c=><option key={c} value={c}>{c}% comm</option>)}
+                      </select>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1089,9 +1287,21 @@ export default function App(){
                         onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem}
                         onNoteChange={updateNote} onRemove={()=>removeDay(day.id)}
                         onDuplicate={()=>duplicateDay(day.id)}
+                        onMoveDay={(dir)=>mutate(it=>{const days=[...it.days];const ni=di+dir;if(ni<0||ni>=days.length)return it;[days[di],days[ni]]=[days[ni],days[di]];return{...it,days};})}
+                        isFirstDay={di===0} isLastDay={di===active.days.length-1}
                       />
                     ))}
                     <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",marginTop:4}}>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Before You Arrive</span>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Terms & Conditions</span>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                    </div>
                   </>
                 )}
 
