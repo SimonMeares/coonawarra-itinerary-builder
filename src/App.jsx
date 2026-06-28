@@ -1306,7 +1306,28 @@ ${styles}
         >
           {sharing ? "Deploying..." : "Share link"}
         </button>
-        <button style={S.btnPrimary} onClick={() => window.print()}>Print / PDF</button>
+        <button style={S.btnPrimary} onClick={() => {
+          const docEl = document.getElementById('print-doc');
+          if (!docEl) return;
+          const printWindow = window.open('', '_blank');
+          printWindow.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${meta.title || 'Coonawarra Experiences — Itinerary'}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabin:wght@700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Source Sans 3', system-ui, sans-serif; background: white; }
+-webkit-print-color-adjust: exact;
+print-color-adjust: exact;
+</style>
+</head>
+<body>${docEl.outerHTML}</body>
+</html>`);
+          printWindow.document.close();
+          printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
+        }}>Print / PDF</button>
       </div>
 
       {/* Share result / error */}
