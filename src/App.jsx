@@ -179,7 +179,7 @@ function newItinerary(){
   return{
     id:uid(),ceRef:"",rezdyRef:"",title:"New Itinerary",clientName:"",clientEmail:"",
     guestCount:2,arrivalDate:"",departureDate:"",origin:"Melbourne",
-    status:"draft",totalPrice:"",showPricing:false,tradeMode:false,commission:20,
+    status:"draft",totalPrice:"",expiryDate:"",showPricing:false,tradeMode:false,commission:20,printFlow:false,
     intro:"",hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they've built with the region's people, places and producers.",
     emailIntro:"",beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
     terms:DEFAULT_TERMS,notes:"",
@@ -410,7 +410,25 @@ function ImageUploader({productId,images,onImagesChange}){
 function ImageStrip({images}){
   if(!images?.length)return null;
   const show=images.slice(0,4);
-  return<div style={{display:"grid",gridTemplateColumns:`repeat(${show.length},1fr)`,gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>{show.map((src,i)=><img key={i} src={src} alt="" style={{width:"100%",height:show.length===1?260:100,objectFit:"cover",objectPosition:"center center",display:"block"}} crossOrigin="anonymous"/>)}</div>;
+  if(show.length===1){
+    return<div style={{marginBottom:10,borderRadius:6,overflow:"hidden"}}><img src={show[0]} alt="" style={{width:"100%",height:260,objectFit:"cover",objectPosition:"center center",display:"block"}} crossOrigin="anonymous"/></div>;
+  }
+  if(show.length===2){
+    return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
+      {show.map((s,i)=><img key={i} src={s} alt="" style={{width:"100%",height:180,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>)}
+    </div>;
+  }
+  if(show.length===3){
+    return<div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gridTemplateRows:"auto auto",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
+      <img src={show[0]} alt="" style={{width:"100%",height:180,objectFit:"cover",objectPosition:"center",display:"block",gridRow:"1 / 3"}} crossOrigin="anonymous"/>
+      <img src={show[1]} alt="" style={{width:"100%",height:87,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
+      <img src={show[2]} alt="" style={{width:"100%",height:87,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
+    </div>;
+  }
+  // 4 images — 2x2 grid
+  return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
+    {show.map((s,i)=><img key={i} src={s} alt="" style={{width:"100%",height:130,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>)}
+  </div>;
 }
 
 // ─── PDF attachment manager ───────────────────────────────────────────────────
@@ -788,7 +806,8 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         )}
         <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid rgba(255,255,255,0.1)`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
           <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.35)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
-          <div style={{display:"flex",gap:12}}>
+          <div style={{display:"flex",gap:12,alignItems:"center"}}>
+            {itinerary.expiryDate&&<div style={{fontFamily:F.body,fontSize:9,color:C.terra,fontWeight:600}}>Quote valid until {fmtDate(itinerary.expiryDate)}</div>}
             {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.5)"}}><span style={{color:C.sand}}>Ref</span> {itinerary.ceRef}</div>}
             {itinerary.rezdyRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.5)"}}><span style={{color:C.sand}}>Rezdy</span> {itinerary.rezdyRef}</div>}
           </div>
@@ -798,7 +817,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       {/* Intro */}
       {itinerary.intro&&(
         <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
-          <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>About this journey</div>
+          <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>{isTrade?"Product overview":"About this journey"}</div>
           <div style={{fontFamily:F.serif,fontSize:14,color:C.navy,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.intro}</div>
         </div>
       )}
@@ -818,7 +837,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       {itinerary.days.map((day,di)=>{
         const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
         return(
-          <div key={day.id} className={di>0?"print-break":""} style={{marginBottom:20}}>
+          <div key={day.id} className={di>0&&!itinerary.printFlow?"print-break":""} style={{marginBottom:20}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
               <span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase"}}>DAY {di+1}</span>
               <div style={{flex:1}}>
@@ -885,7 +904,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       })}
 
       {/* Before you arrive */}
-      {itinerary.beforeYouArrive&&(
+      {itinerary.beforeYouArrive&&!isTrade&&(
         <div className="print-break" style={{marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
             <span style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>Before You Arrive</span>
@@ -897,7 +916,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       {/* Terms */}
       {itinerary.terms&&(
         <div className="print-break" style={{marginBottom:20}}>
-          <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>Terms & Conditions</div>
+          <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>{isTrade?"Booking Conditions":"Terms & Conditions"}</div>
           <div style={{fontFamily:F.body,fontSize:11,color:C.grey600,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{itinerary.terms}</div>
         </div>
       )}
@@ -953,7 +972,7 @@ function generateOfflineHTML(itinerary, allProducts, productImages) {
       ${itinerary.origin?`<span><b>Origin</b> · ${itinerary.origin}</span>`:""}
     </div>
     ${itinerary.totalPrice?`<div class="price-box"><div class="price-label">Total investment</div><div class="price-val">${itinerary.totalPrice}</div></div>`:""}
-    <div class="season-note">Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST${itinerary.ceRef?` &nbsp;·&nbsp; Ref ${itinerary.ceRef}`:""}${itinerary.rezdyRef?` &nbsp;·&nbsp; Rezdy ${itinerary.rezdyRef}`:""}</div>
+    <div class="season-note">Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST${itinerary.ceRef?` &nbsp;·&nbsp; Ref ${itinerary.ceRef}`:""}${itinerary.rezdyRef?` &nbsp;·&nbsp; Rezdy ${itinerary.rezdyRef}`:""}${itinerary.expiryDate?` &nbsp;·&nbsp; <span style="color:#d34727;font-weight:600;">Quote valid until ${fmtD(itinerary.expiryDate)}</span>`:""}</div>
   </div>`;
 
   // Intro
@@ -1063,74 +1082,34 @@ h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957
 }
 
 // ─── Netlify deploy ───────────────────────────────────────────────────────────
-const NETLIFY_TOKEN = "nfp_eVKf8vaypAzNtuNU17fQcTuYNv7r8gHWb6a5";
-const NETLIFY_SITE_ID = "3278b6b0-6266-4941-b15e-8dc50f6dd5e3";
+// Token is stored server-side as NETLIFY_DEPLOY_TOKEN environment variable.
+// The browser calls /.netlify/functions/deploy which proxies to the Netlify API.
 const NETLIFY_LIVE_URL = "https://ce-limestonecoast.netlify.app";
-
-async function deployToNetlify(itinerary, allProducts, productImages) {
-  const html = generateOfflineHTML(itinerary, allProducts, productImages);
-
-  // Build a zip containing index.html using JSZip-free approach
-  // Netlify API accepts a single HTML file deploy via form upload
-  const blob = new Blob([html], {type:"text/html"});
-
-  // Use Netlify Files API — deploy a single file as index.html
-  const formData = new FormData();
-  formData.append("file", new File([blob], "index.html", {type:"text/html"}));
-
-  // First create a new deploy
-  const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${NETLIFY_SITE_ID}/deploys`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${NETLIFY_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      files: {"index.html": await sha1(html)},
-      async: false,
-    }),
-  });
-
-  if (!deployRes.ok) {
-    const err = await deployRes.json().catch(()=>({}));
-    throw new Error(err?.message || `Netlify error ${deployRes.status}`);
-  }
-
-  const deploy = await deployRes.json();
-  const deployId = deploy.id;
-
-  // Upload the file
-  const uploadRes = await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}/files/index.html`, {
-    method: "PUT",
-    headers: {
-      "Authorization": `Bearer ${NETLIFY_TOKEN}`,
-      "Content-Type": "text/html",
-    },
-    body: html,
-  });
-
-  if (!uploadRes.ok) {
-    const err = await uploadRes.json().catch(()=>({}));
-    throw new Error(err?.message || `Upload error ${uploadRes.status}`);
-  }
-
-  // Poll until deploy is ready (max 30s)
-  for (let i=0; i<15; i++) {
-    await new Promise(r=>setTimeout(r,2000));
-    const statusRes = await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}`, {
-      headers: {"Authorization": `Bearer ${NETLIFY_TOKEN}`},
-    });
-    const status = await statusRes.json();
-    if (status.state === "ready") return NETLIFY_LIVE_URL;
-    if (status.state === "error") throw new Error("Deploy failed on Netlify");
-  }
-  // Return URL anyway — usually live within 30s
-  return NETLIFY_LIVE_URL;
-}
 
 async function sha1(str) {
   const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+async function deployToNetlify(itinerary, allProducts, productImages) {
+  const html = generateOfflineHTML(itinerary, allProducts, productImages);
+  const fileHash = await sha1(html);
+
+  // Call our serverless function — token never touches the browser
+  const res = await fetch("/.netlify/functions/deploy", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({html, fileHash}),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err?.error || `Deploy error ${res.status}`);
+  }
+
+  const result = await res.json();
+  if (result.error) throw new Error(result.error);
+  return NETLIFY_LIVE_URL;
 }
 
 // ─── Share button component ────────────────────────────────────────────────────
@@ -1708,6 +1687,10 @@ export default function App(){
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total price</span>
                     <input value={active.totalPrice||""} onChange={e=>mutate(it=>({...it,totalPrice:e.target.value}))} placeholder="e.g. From $3,975 per couple" style={{...fi,width:220}}/>
                   </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Quote valid until</span>
+                    <input type="date" value={active.expiryDate||""} onChange={e=>mutate(it=>({...it,expiryDate:e.target.value}))} style={{...fi}}/>
+                  </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
                     <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show item pricing</span>
                     <div onClick={()=>mutate(it=>({...it,showPricing:!it.showPricing}))} style={{width:32,height:17,borderRadius:9,background:active.showPricing?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
@@ -1753,6 +1736,15 @@ export default function App(){
                       />
                     ))}
                     <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,marginTop:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Print layout</div>
+                        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{active.printFlow?"Experiences flow continuously — compact layout":"Each day starts on a new page — more space per day"}</div>
+                      </div>
+                      <div onClick={()=>mutate(it=>({...it,printFlow:!it.printFlow}))} style={{width:36,height:20,borderRadius:10,background:active.printFlow?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                        <div style={{position:"absolute",top:3,left:active.printFlow?16:3,width:14,height:14,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                      </div>
+                    </div>
                     <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",marginTop:4}}>
                       <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
                       <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Before You Arrive</span>
