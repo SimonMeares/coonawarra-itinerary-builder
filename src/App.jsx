@@ -1062,6 +1062,124 @@ h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957
 </style></head><body>${body}</body></html>`;
 }
 
+// ─── Netlify deploy ───────────────────────────────────────────────────────────
+const NETLIFY_TOKEN = "nfp_eVKf8vaypAzNtuNU17fQcTuYNv7r8gHWb6a5";
+const NETLIFY_SITE_ID = "3278b6b0-6266-4941-b15e-8dc50f6dd5e3";
+const NETLIFY_LIVE_URL = "https://ce-limestonecoast.netlify.app";
+
+async function deployToNetlify(itinerary, allProducts, productImages) {
+  const html = generateOfflineHTML(itinerary, allProducts, productImages);
+
+  // Build a zip containing index.html using JSZip-free approach
+  // Netlify API accepts a single HTML file deploy via form upload
+  const blob = new Blob([html], {type:"text/html"});
+
+  // Use Netlify Files API — deploy a single file as index.html
+  const formData = new FormData();
+  formData.append("file", new File([blob], "index.html", {type:"text/html"}));
+
+  // First create a new deploy
+  const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${NETLIFY_SITE_ID}/deploys`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${NETLIFY_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      files: {"index.html": await sha1(html)},
+      async: false,
+    }),
+  });
+
+  if (!deployRes.ok) {
+    const err = await deployRes.json().catch(()=>({}));
+    throw new Error(err?.message || `Netlify error ${deployRes.status}`);
+  }
+
+  const deploy = await deployRes.json();
+  const deployId = deploy.id;
+
+  // Upload the file
+  const uploadRes = await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}/files/index.html`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${NETLIFY_TOKEN}`,
+      "Content-Type": "text/html",
+    },
+    body: html,
+  });
+
+  if (!uploadRes.ok) {
+    const err = await uploadRes.json().catch(()=>({}));
+    throw new Error(err?.message || `Upload error ${uploadRes.status}`);
+  }
+
+  // Poll until deploy is ready (max 30s)
+  for (let i=0; i<15; i++) {
+    await new Promise(r=>setTimeout(r,2000));
+    const statusRes = await fetch(`https://api.netlify.com/api/v1/deploys/${deployId}`, {
+      headers: {"Authorization": `Bearer ${NETLIFY_TOKEN}`},
+    });
+    const status = await statusRes.json();
+    if (status.state === "ready") return NETLIFY_LIVE_URL;
+    if (status.state === "error") throw new Error("Deploy failed on Netlify");
+  }
+  // Return URL anyway — usually live within 30s
+  return NETLIFY_LIVE_URL;
+}
+
+async function sha1(str) {
+  const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// ─── Share button component ────────────────────────────────────────────────────
+function ShareButton({itinerary, allProducts, productImages}) {
+  const [state, setState] = useState("idle"); // idle | deploying | done | error
+  const [liveUrl, setLiveUrl] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  async function handleDeploy() {
+    setState("deploying");
+    try {
+      const url = await deployToNetlify(itinerary, allProducts, productImages);
+      setLiveUrl(url);
+      setState("done");
+    } catch(e) {
+      console.error(e);
+      setState("error");
+      setTimeout(()=>setState("idle"), 4000);
+    }
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(liveUrl).then(()=>{
+      setCopied(true);
+      setTimeout(()=>setCopied(false), 2000);
+    });
+  }
+
+  if (state==="done") return (
+    <div style={{display:"flex",alignItems:"center",gap:4}}>
+      <div style={{fontFamily:F.body,fontSize:10,color:C.white,background:"rgba(255,255,255,0.15)",borderRadius:5,padding:"5px 10px",maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>https://ce-limestonecoast.netlify.app</div>
+      <button onClick={handleCopy} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 10px"}}>
+        {copied?"✓ Copied":"Copy link"}
+      </button>
+      <button onClick={handleDeploy} style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.6)",background:"transparent",border:`1px solid rgba(255,255,255,0.2)`,borderRadius:5,padding:"5px 8px"}}>↺</button>
+    </div>
+  );
+
+  return (
+    <button onClick={handleDeploy} disabled={state==="deploying"}
+      style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",
+        color:C.white,background:state==="error"?C.terra:"#2d6a4f",border:"none",borderRadius:5,padding:"6px 12px",
+        opacity:state==="deploying"?0.7:1,cursor:state==="deploying"?"not-allowed":"pointer"}}
+    >
+      {state==="deploying"?"Publishing...":state==="error"?"✗ Failed":"🔗 Share link"}
+    </button>
+  );
+}
+
 // ─── Email builder ────────────────────────────────────────────────────────────
 function buildEmailBody(itinerary,allProducts){
   const lines=[];
@@ -1451,6 +1569,7 @@ export default function App(){
                 ))}
                 <button onClick={()=>setShowFxSettings(v=>!v)} style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.5)",background:"transparent",border:"none",padding:"3px 5px"}} title="Edit exchange rates">⚙</button>
               </div>
+              <ShareButton itinerary={active} allProducts={allProducts} productImages={productImages}/>
               <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
               <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages}/>
               <button onClick={()=>{
