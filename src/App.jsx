@@ -939,12 +939,8 @@ function ProductLibrary({ products, setProducts }) {
 
 // ── Builder tab ───────────────────────────────────────────────────────────────
 function Builder({ products, loadedItinerary }) {
-  const [meta, setMeta] = useLocalStorage("ce_meta", {
-    title: "", guests: "", startDate: "", ref: ""
-  });
-  const [days, setDays] = useLocalStorage("ce_days", [
-    { id: genId(), title: "Day 1", subtitle: "", blocks: [] }
-  ]);
+  const [meta, setMeta] = useState({ title: "", guests: "", startDate: "", ref: "" });
+  const [days, setDays] = useState([{ id: genId(), title: "Day 1", subtitle: "", blocks: [] }]);
   const [mapsKey, setMapsKey] = useLocalStorage("ce_maps_key", "");
   const [savedItineraries, setSavedItineraries] = useLocalStorage("ce_saved_itineraries", []);
   const [currentId, setCurrentId] = useState(null);
@@ -2042,12 +2038,12 @@ function FlightLookup() {
 
 // ── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab] = useState("itineraries");
+  const [tab, setTab] = useState("builder");
   const [products, setProducts] = useLocalStorage("ce_products", SEED_PRODUCTS);
   const [loadedItinerary, setLoadedItinerary] = useState(null);
 
   function handleOpenItinerary(it) {
-    setLoadedItinerary(it);
+    setLoadedItinerary(it || { meta: { title: "", guests: "", startDate: "", ref: "" }, days: [{ id: genId(), title: "Day 1", subtitle: "", blocks: [] }], id: null, status: "Draft" });
     setTab("builder");
   }
 
