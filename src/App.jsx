@@ -1573,7 +1573,7 @@ function FlightLookup() {
     try {
       const code = flightNum.trim().toUpperCase().replace(/\s+/g, "");
       const today = new Date().toISOString().slice(0, 10);
-      const url = `https://aerodatabox.p.rapidapi.com/flights/iata/${code}/${today}`;
+      const url = `https://aerodatabox.p.rapidapi.com/flights/number/${code}/${today}`;
       const res = await fetch(url, {
         method: "GET",
         headers: {
