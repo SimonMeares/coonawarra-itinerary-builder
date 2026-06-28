@@ -1309,25 +1309,28 @@ ${styles}
         <button style={S.btnPrimary} onClick={() => {
           const docEl = document.getElementById('print-doc');
           if (!docEl) return;
-          const printWindow = window.open('', '_blank');
-          printWindow.document.write(`<!DOCTYPE html>
+          const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>${meta.title || 'Coonawarra Experiences — Itinerary'}</title>
+<title>${meta.title || 'Coonawarra Experiences Itinerary'}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cabin:wght@700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Source Sans 3', system-ui, sans-serif; background: white; }
--webkit-print-color-adjust: exact;
-print-color-adjust: exact;
+body { font-family: 'Source Sans 3', system-ui, sans-serif; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media print { body { margin: 0; } * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
 </style>
 </head>
 <body>${docEl.outerHTML}</body>
-</html>`);
-          printWindow.document.close();
-          printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
-        }}>Print / PDF</button>
+</html>`;
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = (meta.title || 'CE-Itinerary') + '.html';
+          a.click();
+          URL.revokeObjectURL(url);
+        }}>Download HTML</button>
       </div>
 
       {/* Share result / error */}
