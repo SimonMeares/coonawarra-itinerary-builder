@@ -938,11 +938,132 @@ function buildEmailBody(itinerary,allProducts){
   return lines.join("\n");
 }
 
-function sendEmail(itinerary,allProducts){
-  const subject=encodeURIComponent(`Your Coonawarra Experiences Itinerary — ${itinerary.title}`);
-  const to=encodeURIComponent(itinerary.clientEmail||"");
-  const body=encodeURIComponent(buildEmailBody(itinerary,allProducts));
-  window.location.href=`mailto:${to}?subject=${subject}&body=${body}`;
+// Build HTML email body for Gmail draft
+function buildHtmlEmailBody(itinerary, allProducts) {
+  const navy="#192957", sand="#d8c69d", teal="#40c0c0", terra="#d34727", grey="#5c5a54";
+  const fmtD=d=>{if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});};
+  let html=`<div style="font-family:Arial,sans-serif;max-width:620px;color:#1a1917;">`;
+
+  // Opening
+  html+=`<p style="margin-bottom:16px;">Dear ${itinerary.clientName||"there"},</p>`;
+  html+=`<p style="margin-bottom:16px;">Thank you for your interest in a private journey with Coonawarra Experiences. Please find your itinerary below.</p>`;
+
+  if(itinerary.intro){html+=`<p style="margin-bottom:16px;font-style:italic;color:${grey};">${itinerary.intro}</p>`;}
+
+  // Key details
+  html+=`<table style="width:100%;border-collapse:collapse;background:#f0ead8;border-radius:8px;margin-bottom:20px;">`;
+  html+=`<tr><td colspan="2" style="padding:12px 16px 6px;font-size:11px;font-weight:700;color:${navy};letter-spacing:.08em;text-transform:uppercase;">Journey Details</td></tr>`;
+  if(itinerary.arrivalDate)html+=`<tr><td style="padding:3px 16px;font-size:12px;color:${grey};width:120px;">Arrival</td><td style="padding:3px 16px;font-size:12px;font-weight:600;color:${navy};">${fmtD(itinerary.arrivalDate)}</td></tr>`;
+  if(itinerary.departureDate)html+=`<tr><td style="padding:3px 16px;font-size:12px;color:${grey};">Departure</td><td style="padding:3px 16px;font-size:12px;font-weight:600;color:${navy};">${fmtD(itinerary.departureDate)}</td></tr>`;
+  if(itinerary.guestCount)html+=`<tr><td style="padding:3px 16px;font-size:12px;color:${grey};">Guests</td><td style="padding:3px 16px;font-size:12px;font-weight:600;color:${navy};">${itinerary.guestCount}</td></tr>`;
+  if(itinerary.totalPrice)html+=`<tr><td style="padding:3px 16px 12px;font-size:12px;color:${grey};">Investment</td><td style="padding:3px 16px 12px;font-size:14px;font-weight:700;color:${terra};">${itinerary.totalPrice}</td></tr>`;
+  html+=`</table>`;
+
+  // Days
+  itinerary.days.forEach((day,di)=>{
+    html+=`<div style="margin-bottom:20px;">`;
+    html+=`<div style="border-bottom:2px solid ${sand};padding-bottom:6px;margin-bottom:10px;">`;
+    html+=`<span style="font-size:9px;font-weight:700;color:${terra};letter-spacing:.1em;text-transform:uppercase;margin-right:8px;">DAY ${di+1}</span>`;
+    html+=`<span style="font-size:16px;font-weight:700;color:${navy};">${day.title}</span>`;
+    if(day.location)html+=`<span style="font-size:11px;color:#9e9b92;margin-left:8px;">· ${day.location}</span>`;
+    html+=`</div>`;
+    if(day.dayNotes)html+=`<p style="font-size:12px;color:${grey};margin-bottom:10px;padding:8px 12px;background:#f0ead8;border-radius:5px;">${day.dayNotes}</p>`;
+    day.items.forEach(item=>{
+      const p=allProducts.find(x=>x.id===item.productId);
+      if(!p)return;
+      html+=`<div style="margin-bottom:8px;padding:10px 14px;background:#ffffff;border:1px solid #e8e6e0;border-radius:6px;border-left:3px solid ${navy};">`;
+      html+=`<div style="font-size:13px;font-weight:700;color:${navy};margin-bottom:2px;">${p.name}</div>`;
+      if(p.location)html+=`<div style="font-size:11px;color:#9e9b92;margin-bottom:4px;">${p.location}</div>`;
+      if(p.duration)html+=`<div style="font-size:11px;color:${teal};margin-bottom:4px;">${p.duration}</div>`;
+      if(p.description)html+=`<p style="font-size:12px;color:${grey};line-height:1.5;margin:4px 0;">${p.description}</p>`;
+      if(item.notes)html+=`<p style="font-size:11px;font-style:italic;color:${navy};margin-top:6px;">Note: ${item.notes}</p>`;
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  });
+
+  // Closing
+  html+=`<p style="margin-top:20px;margin-bottom:8px;">I would love to discuss this itinerary further and tailor it to your preferences.</p>`;
+  html+=`<p style="margin-bottom:20px;">Please don't hesitate to call or email at any time.</p>`;
+  html+=`<div style="border-top:1px solid #e8e6e0;padding-top:16px;margin-top:16px;">`;
+  html+=`<p style="margin:0;font-weight:600;color:${navy};">Warm regards,</p>`;
+  html+=`<p style="margin:4px 0 0;color:${navy};">Simon & Kerry Meares</p>`;
+  html+=`<p style="margin:2px 0 0;font-size:12px;color:${grey};">Coonawarra Experiences</p>`;
+  html+=`<p style="margin:2px 0 0;font-size:12px;color:${grey};">1800 861 190 · info@coonawarraexperiences.com.au</p>`;
+  html+=`<p style="margin:2px 0 0;font-size:12px;color:${grey};">coonawarraexperiences.com.au</p>`;
+  html+=`</div></div>`;
+  return html;
+}
+
+async function createGmailDraft(itinerary, allProducts) {
+  const subject = `Your Coonawarra Experiences Itinerary — ${itinerary.title}`;
+  const to = itinerary.clientEmail || "";
+  const htmlBody = buildHtmlEmailBody(itinerary, allProducts);
+  const plainBody = buildEmailBody(itinerary, allProducts);
+
+  // Construct RFC 2822 message
+  const fromAddr = "info@coonawarraexperiences.com.au";
+  const boundary = "boundary_ce_" + Math.random().toString(36).slice(2);
+  const rfcMessage = [
+    `From: ${fromAddr}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset="UTF-8"`,
+    ``,
+    plainBody,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/html; charset="UTF-8"`,
+    ``,
+    htmlBody,
+    ``,
+    `--${boundary}--`,
+  ].join("\r\n");
+
+  // Base64url encode
+  const encoded = btoa(unescape(encodeURIComponent(rfcMessage)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { raw: encoded } }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err?.error?.message || `Gmail API error ${res.status}`);
+  }
+  return await res.json();
+}
+
+// ─── Gmail draft button ───────────────────────────────────────────────────────
+function EmailDraftButton({itinerary,allProducts}){
+  const[state,setState]=useState("idle"); // idle | loading | success | error
+  const[msg,setMsg]=useState("");
+  async function handleClick(){
+    setState("loading");setMsg("");
+    try{
+      await createGmailDraft(itinerary,allProducts);
+      setState("success");setMsg("Draft created in Gmail");
+      setTimeout(()=>setState("idle"),3000);
+    }catch(e){
+      setState("error");setMsg(e.message||"Failed — check Gmail connection");
+      setTimeout(()=>setState("idle"),4000);
+    }
+  }
+  const bg=state==="success"?C.teal:state==="error"?C.terra:C.teal;
+  const label=state==="loading"?"Creating...":state==="success"?"✓ Draft created":state==="error"?"✗ Failed":"Email Draft";
+  return(
+    <div style={{position:"relative",display:"inline-block"}}>
+      <button onClick={handleClick} disabled={state==="loading"} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:bg,border:"none",borderRadius:5,padding:"6px 12px",opacity:state==="loading"?0.7:1,cursor:state==="loading"?"not-allowed":"pointer"}}>{label}</button>
+      {msg&&state!=="idle"&&<div style={{position:"absolute",top:"calc(100% + 6px)",right:0,background:state==="success"?C.teal:C.terra,color:C.white,fontFamily:F.body,fontSize:10,borderRadius:5,padding:"4px 10px",whiteSpace:"nowrap",zIndex:10}}>{msg}</div>}
+    </div>
+  );
 }
 
 // ─── Status ───────────────────────────────────────────────────────────────────
@@ -1114,7 +1235,7 @@ export default function App(){
           {tab==="builder"&&active&&bView==="preview"&&(
             <>
               <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
-              <button onClick={()=>sendEmail(active,allProducts)} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"6px 12px"}}>Email Draft</button>
+              <EmailDraftButton itinerary={active} allProducts={allProducts}/>
               <button onClick={()=>{
                 const html=generateOfflineHTML(active,allProducts,productImages);
                 const blob=new Blob([html],{type:"text/html"});
