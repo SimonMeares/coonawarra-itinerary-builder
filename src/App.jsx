@@ -2450,29 +2450,35 @@ export default function App(){
                                   Day {di+1}{d.title?` · ${d.title}`:""}
                                 </div>
                                 {dayRows.map(r=>(
-                                  <div key={r.item.id} style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",padding:"8px 12px",gap:8,borderTop:`1px solid ${C.grey100}`,alignItems:"center"}}>
-                                    <div>
-                                      <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>{r.item.overrides?.name||r.product.name}</div>
-                                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>
-                                        {r.product.pricing.structure==="component"?"Component / incl. in package":r.product.pricing.structure==="on_request"?"Price on request":r.sell!=null?`${formatPrice(r.product.pricing)} · ${pax} guests`:"Manual pricing"}
+                                  <div key={r.item.id} style={{borderTop:`1px solid ${C.grey100}`}}>
+                                    <div style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",padding:"8px 12px 4px",gap:8,alignItems:"center"}}>
+                                      <div>
+                                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>{r.item.overrides?.name||r.product.name}</div>
+                                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>
+                                          {r.product.pricing.structure==="component"?"Component / incl. in package":r.product.pricing.structure==="on_request"?"Price on request":r.sell!=null?`${formatPrice(r.product.pricing)} · ${pax} guests`:"Manual pricing"}
+                                        </div>
+                                      </div>
+                                      <div style={{fontFamily:F.body,fontSize:12,color:C.navy,textAlign:"right"}}>
+                                        {r.item.overrides?.priceDisplay?<span style={{fontStyle:"italic",color:C.grey400}}>{r.item.overrides.priceDisplay}</span>:r.sell!=null?`$${r.sell.toLocaleString()}`:<span style={{color:C.grey400}}>—</span>}
+                                      </div>
+                                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                        <input type="number" min={0} value={r.costEntry?.amount!=null?r.costEntry.amount:""} onChange={e=>updateProductCost(r.product.id,"amount",e.target.value!=""?parseFloat(e.target.value):null)} placeholder="Enter cost" style={{flex:1,fontFamily:F.body,fontSize:11,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 6px",textAlign:"right",minWidth:0,outline:"none"}}/>
+                                        <select value={r.costEntry?.structure||"flat"} onChange={e=>updateProductCost(r.product.id,"structure",e.target.value)} style={{fontFamily:F.body,fontSize:9,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 3px",color:C.grey600,background:C.white,outline:"none"}}>
+                                          <option value="flat">flat</option>
+                                          <option value="per_person">pp</option>
+                                          <option value="per_couple">p/c</option>
+                                        </select>
+                                      </div>
+                                      <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:r.margin!=null?(r.margin>=0?C.teal:C.terra):C.grey400,textAlign:"right"}}>
+                                        {r.margin!=null?`$${r.margin.toLocaleString()}`:"—"}
+                                      </div>
+                                      <div style={{fontFamily:F.body,fontSize:11,color:r.marginPct!=null?(r.marginPct>=20?C.teal:C.terra):C.grey400,textAlign:"right"}}>
+                                        {r.marginPct!=null?`${r.marginPct}%`:""}
                                       </div>
                                     </div>
-                                    <div style={{fontFamily:F.body,fontSize:12,color:C.navy,textAlign:"right"}}>
-                                      {r.item.overrides?.priceDisplay?<span style={{fontStyle:"italic",color:C.grey400}}>{r.item.overrides.priceDisplay}</span>:r.sell!=null?`$${r.sell.toLocaleString()}`:<span style={{color:C.grey400}}>—</span>}
-                                    </div>
-                                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                                      <input type="number" min={0} value={r.costEntry?.amount!=null?r.costEntry.amount:""} onChange={e=>updateProductCost(r.product.id,"amount",e.target.value!=""?parseFloat(e.target.value):null)} placeholder="Cost" style={{flex:1,fontFamily:F.body,fontSize:11,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 6px",textAlign:"right",minWidth:0,outline:"none"}}/>
-                                      <select value={r.costEntry?.structure||"flat"} onChange={e=>updateProductCost(r.product.id,"structure",e.target.value)} style={{fontFamily:F.body,fontSize:9,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 3px",color:C.grey600,background:C.white,outline:"none"}}>
-                                        <option value="flat">flat</option>
-                                        <option value="per_person">pp</option>
-                                        <option value="per_couple">p/c</option>
-                                      </select>
-                                    </div>
-                                    <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:r.margin!=null?(r.margin>=0?C.teal:C.terra):C.grey400,textAlign:"right"}}>
-                                      {r.margin!=null?`$${r.margin.toLocaleString()}`:"—"}
-                                    </div>
-                                    <div style={{fontFamily:F.body,fontSize:11,color:r.marginPct!=null?(r.marginPct>=20?C.teal:C.terra):C.grey400,textAlign:"right"}}>
-                                      {r.marginPct!=null?`${r.marginPct}%`:""}
+                                    <div style={{padding:"0 12px 7px",display:"flex",alignItems:"center",gap:6}}>
+                                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,flexShrink:0}}>Cost notes</span>
+                                      <input type="text" value={r.costEntry?.notes||""} onChange={e=>updateProductCost(r.product.id,"notes",e.target.value||null)} placeholder="e.g. $400 guide fee / $200 lunch / $50 diesel" style={{flex:1,fontFamily:F.body,fontSize:10,color:C.grey600,border:"none",borderBottom:`1px dashed ${C.grey200}`,padding:"1px 4px",outline:"none",background:"transparent"}}/>
                                     </div>
                                   </div>
                                 ))}
