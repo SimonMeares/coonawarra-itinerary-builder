@@ -766,7 +766,11 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
             <div style={{fontFamily:F.body,fontSize:9,color:heroImg?C.grey400:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{p.category}{p.custom?" · Custom":""}</div>
             <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:heroImg?C.navy:C.white,lineHeight:1.2}}>{p.name||"Untitled"}</div>
           </div>
-          {p.custom&&<div style={{display:"flex",gap:3,flexShrink:0}}><button onClick={onEdit} style={{fontFamily:F.body,fontSize:9,color:C.teal,background:`${C.teal}18`,border:`1px solid ${C.teal}30`,borderRadius:4,padding:"1px 6px"}}>Edit</button><button onClick={onDuplicate} style={{fontFamily:F.body,fontSize:9,color:C.navy,background:`${C.navy}12`,border:`1px solid ${C.navy}30`,borderRadius:4,padding:"1px 6px"}}>Copy</button><button onClick={onDelete} style={{fontFamily:F.body,fontSize:9,color:C.terra,background:`${C.terra}18`,border:`1px solid ${C.terra}30`,borderRadius:4,padding:"1px 6px"}}>Del</button></div>}
+          <div style={{display:"flex",gap:3,flexShrink:0}}>
+            {p.custom&&<button onClick={onEdit} style={{fontFamily:F.body,fontSize:9,color:C.teal,background:`${C.teal}18`,border:`1px solid ${C.teal}30`,borderRadius:4,padding:"1px 6px"}}>Edit</button>}
+            <button onClick={onDuplicate} style={{fontFamily:F.body,fontSize:9,color:C.navy,background:`${C.navy}12`,border:`1px solid ${C.navy}30`,borderRadius:4,padding:"1px 6px"}}>Copy</button>
+            {p.custom&&<button onClick={onDelete} style={{fontFamily:F.body,fontSize:9,color:C.terra,background:`${C.terra}18`,border:`1px solid ${C.terra}30`,borderRadius:4,padding:"1px 6px"}}>Del</button>}
+          </div>
         </div>
       </div>
       <div style={{padding:"8px 12px"}}>
@@ -1815,7 +1819,7 @@ export default function App(){
   }
 
   function handleDuplicateProduct(product){
-    const copy={...JSON.parse(JSON.stringify(product)),id:uid(),name:product.name+" (copy)"};
+    const copy={...JSON.parse(JSON.stringify(product)),id:uid(),name:product.name+" (copy)",custom:true};
     const next=[copy,...customProducts];
     setCPs(next);saveCP(next);
     setLibCat(product.category==="Accommodation"?"Accommodation":"Custom");
