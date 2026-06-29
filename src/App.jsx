@@ -2313,8 +2313,20 @@ export default function App(){
                 </div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Guests</span>
+                    <input type="number" min={1} max={20} value={active.guestCount||""} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||""}))} placeholder="2" style={{...fi,width:52,textAlign:"center"}}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Arrival</span>
-                    <input type="date" value={active.arrivalDate||""} onChange={e=>mutate(it=>({...it,arrivalDate:e.target.value}))} style={fi}/>
+                    <input type="date" value={active.arrivalDate||""} onChange={e=>{
+                      const d=e.target.value;
+                      mutate(it=>{
+                        const noDates=it.days.every(day=>!day.date);
+                        const base=new Date(d+'T12:00:00');
+                        return{...it,arrivalDate:d,days:noDates?it.days.map((day,i)=>{const nd=new Date(base);nd.setDate(base.getDate()+i);return{...day,date:nd.toISOString().split('T')[0]};}):it.days};
+                      });
+                    }} style={fi}/>
+                    {active.arrivalDate&&<button onClick={()=>mutate(it=>{const base=new Date(it.arrivalDate+'T12:00:00');return{...it,days:it.days.map((d,i)=>{const nd=new Date(base);nd.setDate(base.getDate()+i);return{...d,date:nd.toISOString().split('T')[0]};})};} )} style={{fontFamily:F.body,fontSize:9,color:C.teal,background:"transparent",border:`1px solid ${C.teal}40`,borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap"}} title="Fill day dates from arrival">Fill dates</button>}
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Departure</span>
@@ -2504,7 +2516,7 @@ export default function App(){
 
                 {/* Financials tab — internal only, never exported */}
                 {editTab==="financials"&&(()=>{
-                  const pax=active.pax||2;
+                  const pax=active.guestCount||2;
                   const gstDiv=showExGST?1.1:1;
                   const rows=active.days.flatMap(d=>d.items.map(item=>{
                     const p=findProduct(allProducts,item.productId);
@@ -2531,7 +2543,7 @@ export default function App(){
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
                         <label style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Guests</label>
-                        <input type="number" min={1} max={20} value={pax} onChange={e=>mutate(it=>({...it,pax:parseInt(e.target.value)||2}))} style={{width:56,fontFamily:F.body,fontSize:13,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",textAlign:"center",outline:"none"}}/>
+                        <input type="number" min={1} max={20} value={pax} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||2}))} style={{width:56,fontFamily:F.body,fontSize:13,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",textAlign:"center",outline:"none"}}/>
                         <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Used to estimate per-person and tiered pricing totals</span>
                         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
                           <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show ex-GST</span>
