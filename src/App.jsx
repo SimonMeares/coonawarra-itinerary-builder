@@ -768,7 +768,7 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
           </div>
           <div style={{display:"flex",gap:3,flexShrink:0}}>
             {p.custom&&<button onClick={onEdit} style={{fontFamily:F.body,fontSize:9,color:C.teal,background:`${C.teal}18`,border:`1px solid ${C.teal}30`,borderRadius:4,padding:"1px 6px"}}>Edit</button>}
-            <button onClick={onDuplicate} style={{fontFamily:F.body,fontSize:9,color:C.navy,background:`${C.navy}12`,border:`1px solid ${C.navy}30`,borderRadius:4,padding:"1px 6px"}}>Copy</button>
+            <button onClick={onDuplicate} style={{fontFamily:F.body,fontSize:9,color:heroImg?C.navy:C.white,background:heroImg?`${C.navy}12`:"rgba(255,255,255,0.15)",border:`1px solid ${heroImg?C.navy+"30":"rgba(255,255,255,0.35)"}`,borderRadius:4,padding:"1px 6px"}}>Copy</button>
             {p.custom&&<button onClick={onDelete} style={{fontFamily:F.body,fontSize:9,color:C.terra,background:`${C.terra}18`,border:`1px solid ${C.terra}30`,borderRadius:4,padding:"1px 6px"}}>Del</button>}
           </div>
         </div>
