@@ -125,6 +125,34 @@ function formatPrice(pricing){
 
 function typeColor(type){return type==="private"?C.navy:type==="small_group"?C.teal:C.grey400;}
 
+function calcSellForProduct(p,pax){
+  const{structure,tiers}=p.pricing;
+  if(!tiers||!tiers.length)return null;
+  const n=pax||2;
+  if(structure==="per_adult")return(tiers[0]?.retail||0)*n;
+  if(structure==="per_couple")return(tiers[0]?.retail||0)*Math.ceil(n/2);
+  if(structure==="tiered_per_person_by_group"){
+    const sorted=[...tiers].sort((a,b)=>a.pax-b.pax);
+    const t=sorted.find(t=>t.pax>=n)||sorted[sorted.length-1];
+    return(t?.retail||0)*n;
+  }
+  if(structure==="tiered_per_couple_by_group"){
+    const sorted=[...tiers].sort((a,b)=>a.pax-b.pax);
+    const t=sorted.find(t=>t.pax>=n)||sorted[sorted.length-1];
+    return(t?.retail||0)*Math.ceil(n/2);
+  }
+  return null;
+}
+
+function calcCostTotal(costEntry,pax){
+  if(!costEntry||!costEntry.amount)return null;
+  const n=pax||2;
+  const{amount,structure}=costEntry;
+  if(structure==="per_person")return amount*n;
+  if(structure==="per_couple")return amount*Math.ceil(n/2);
+  return amount;
+}
+
 function netPrice(pricing, commPct){
   const{structure,tiers}=pricing;
   if(!tiers||!tiers.length)return null;
@@ -292,6 +320,8 @@ async function getGmailToken() {
 
 function loadCP(){try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
 function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}}
+function loadPC(){try{const r=localStorage.getItem("ce_product_costs_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
+function savePC(v){try{localStorage.setItem("ce_product_costs_v1",JSON.stringify(v));}catch(e){}}
 function loadImgs(){try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveImgs(i){try{localStorage.setItem("ce_product_images_v2",JSON.stringify(i));}catch(e){alert("Failed to save image references.");}}
 function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
@@ -1763,6 +1793,7 @@ const EDIT_TABS=[
   {k:"guest",l:"Guest Info"},
   {k:"content",l:"Content"},
   {k:"attachments",l:"Attachments"},
+  {k:"financials",l:"$ Financials"},
 ];
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -1775,6 +1806,7 @@ export default function App(){
   const[activeId,setActiveId]=useState(null);
   const[productImages,setPImgs]=useState(()=>loadImgs());
   const[customProducts,setCPs]=useState(()=>loadCP());
+  const[productCosts,setPCosts]=useState(()=>loadPC());
   const[templates,setTemplates]=useState(()=>loadTemplates());
   const[libCat,setLibCat]=useState("All");
   const[libSearch,setLibSrch]=useState("");
@@ -1823,6 +1855,11 @@ export default function App(){
     const next=[copy,...customProducts];
     setCPs(next);saveCP(next);
     setLibCat(product.category==="Accommodation"?"Accommodation":"Custom");
+  }
+
+  function updateProductCost(productId,field,value){
+    const next={...productCosts,[productId]:{...productCosts[productId],[field]:value||undefined}};
+    setPCosts(next);savePC(next);
   }
 
   // Template operations
@@ -2364,6 +2401,99 @@ export default function App(){
                     <AttachmentManager attachments={active.attachments} onUpdate={atts=>mutate(it=>({...it,attachments:atts}))}/>
                   </SectionBox>
                 )}
+
+                {/* Financials tab — internal only, never exported */}
+                {editTab==="financials"&&(()=>{
+                  const pax=active.pax||2;
+                  const rows=active.days.flatMap(d=>d.items.map(item=>{
+                    const p=findProduct(allProducts,item.productId);
+                    if(!p)return null;
+                    const sell=calcSellForProduct(p,pax);
+                    const costEntry=productCosts[p.id];
+                    const cost=calcCostTotal(costEntry,pax);
+                    const margin=(sell!=null&&cost!=null)?sell-cost:null;
+                    const marginPct=(margin!=null&&sell>0)?Math.round(margin/sell*100):null;
+                    return{dayId:d.id,dayTitle:d.title,product:p,item,sell,cost,costEntry,margin,marginPct};
+                  })).filter(Boolean);
+                  const hasSell=rows.some(r=>r.sell!=null);
+                  const hasCost=rows.some(r=>r.cost!=null);
+                  const totalSell=hasSell?rows.filter(r=>r.sell!=null).reduce((s,r)=>s+r.sell,0):null;
+                  const totalCost=hasCost?rows.filter(r=>r.cost!=null).reduce((s,r)=>s+r.cost,0):null;
+                  const totalMargin=(totalSell!=null&&totalCost!=null)?totalSell-totalCost:null;
+                  const totalMarginPct=(totalMargin!=null&&totalSell>0)?Math.round(totalMargin/totalSell*100):null;
+                  return(
+                    <div>
+                      <div style={{background:`${C.terra}10`,border:`1px solid ${C.terra}30`,borderRadius:8,padding:"8px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:14}}>🔒</span>
+                        <span style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.terra}}>Internal only — never exported to client or agent</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                        <label style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Guests</label>
+                        <input type="number" min={1} max={20} value={pax} onChange={e=>mutate(it=>({...it,pax:parseInt(e.target.value)||2}))} style={{width:56,fontFamily:F.body,fontSize:13,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",textAlign:"center",outline:"none"}}/>
+                        <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Used to estimate per-person and tiered pricing totals</span>
+                      </div>
+                      {rows.length===0?(
+                        <div style={{fontFamily:F.body,fontSize:13,color:C.grey400,textAlign:"center",padding:"30px 0"}}>No items in this itinerary yet.</div>
+                      ):(
+                        <div style={{border:`1px solid ${C.grey200}`,borderRadius:8,overflow:"hidden"}}>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",background:C.navy,padding:"7px 12px",gap:8}}>
+                            {["Product","Sell (est.)","Your cost","Margin",""].map((h,i)=>(
+                              <div key={i} style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.sand,letterSpacing:"0.08em",textTransform:"uppercase",textAlign:i>0?"right":"left"}}>{h}</div>
+                            ))}
+                          </div>
+                          {active.days.map((d,di)=>{
+                            const dayRows=rows.filter(r=>r.dayId===d.id);
+                            if(!dayRows.length)return null;
+                            return(
+                              <div key={d.id}>
+                                <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",padding:"5px 12px",background:C.grey100,borderTop:`1px solid ${C.grey200}`}}>
+                                  Day {di+1}{d.title?` · ${d.title}`:""}
+                                </div>
+                                {dayRows.map(r=>(
+                                  <div key={r.item.id} style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",padding:"8px 12px",gap:8,borderTop:`1px solid ${C.grey100}`,alignItems:"center"}}>
+                                    <div>
+                                      <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>{r.item.overrides?.name||r.product.name}</div>
+                                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>
+                                        {r.product.pricing.structure==="component"?"Component / incl. in package":r.product.pricing.structure==="on_request"?"Price on request":r.sell!=null?`${formatPrice(r.product.pricing)} · ${pax} guests`:"Manual pricing"}
+                                      </div>
+                                    </div>
+                                    <div style={{fontFamily:F.body,fontSize:12,color:C.navy,textAlign:"right"}}>
+                                      {r.item.overrides?.priceDisplay?<span style={{fontStyle:"italic",color:C.grey400}}>{r.item.overrides.priceDisplay}</span>:r.sell!=null?`$${r.sell.toLocaleString()}`:<span style={{color:C.grey400}}>—</span>}
+                                    </div>
+                                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                      <input type="number" min={0} value={r.costEntry?.amount!=null?r.costEntry.amount:""} onChange={e=>updateProductCost(r.product.id,"amount",e.target.value!=""?parseFloat(e.target.value):null)} placeholder="Cost" style={{flex:1,fontFamily:F.body,fontSize:11,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 6px",textAlign:"right",minWidth:0,outline:"none"}}/>
+                                      <select value={r.costEntry?.structure||"flat"} onChange={e=>updateProductCost(r.product.id,"structure",e.target.value)} style={{fontFamily:F.body,fontSize:9,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 3px",color:C.grey600,background:C.white,outline:"none"}}>
+                                        <option value="flat">flat</option>
+                                        <option value="per_person">pp</option>
+                                        <option value="per_couple">p/c</option>
+                                      </select>
+                                    </div>
+                                    <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:r.margin!=null?(r.margin>=0?C.teal:C.terra):C.grey400,textAlign:"right"}}>
+                                      {r.margin!=null?`$${r.margin.toLocaleString()}`:"—"}
+                                    </div>
+                                    <div style={{fontFamily:F.body,fontSize:11,color:r.marginPct!=null?(r.marginPct>=20?C.teal:C.terra):C.grey400,textAlign:"right"}}>
+                                      {r.marginPct!=null?`${r.marginPct}%`:""}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",padding:"10px 12px",gap:8,borderTop:`2px solid ${C.navy}`,background:C.sandLight,alignItems:"center"}}>
+                            <div style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.navy}}>Total estimate</div>
+                            <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy,textAlign:"right"}}>{totalSell!=null?`$${totalSell.toLocaleString()}`:"—"}</div>
+                            <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,textAlign:"right"}}>{totalCost!=null?`$${totalCost.toLocaleString()}`:"—"}</div>
+                            <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:totalMargin!=null?(totalMargin>=0?C.teal:C.terra):C.grey400,textAlign:"right"}}>{totalMargin!=null?`$${totalMargin.toLocaleString()}`:"—"}</div>
+                            <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:totalMarginPct!=null?(totalMarginPct>=20?C.teal:C.terra):C.grey400,textAlign:"right"}}>{totalMarginPct!=null?`${totalMarginPct}%`:"—"}</div>
+                          </div>
+                        </div>
+                      )}
+                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:10,lineHeight:1.5}}>
+                        Cost entries save per product and carry across all itineraries. Sell totals are estimated at {pax} guest{pax!==1?"s":""}. Enter costs ex GST. Items with component or on-request pricing show "—" in the sell column — enter the sell value manually in the item override if needed.
+                      </div>
+                    </div>
+                  );
+                })()}
 
               </div>
             </div>
