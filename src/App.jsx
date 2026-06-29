@@ -125,6 +125,37 @@ function formatPrice(pricing){
 
 function typeColor(type){return type==="private"?C.navy:type==="small_group"?C.teal:C.grey400;}
 
+function estimateItinerarySell(it,allProducts){
+  const pax=it.pax||2;
+  return it.days.flatMap(d=>d.items).reduce((sum,item)=>{
+    const p=findProduct(allProducts,item.productId);
+    if(!p)return sum;
+    const s=calcSellForProduct(p,pax);
+    return s!=null?sum+s:sum;
+  },0);
+}
+
+function checkAvailabilityWarning(product,dateStr){
+  if(!dateStr||!product.departures)return null;
+  const deps=product.departures;
+  const DS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const DO=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  if(!DS.some(d=>deps.includes(d)))return null;
+  let allowed=new Set(DS.filter(d=>deps.includes(d)));
+  const rm=deps.match(/([A-Z][a-z]{2})[–\-]([A-Z][a-z]{2})/);
+  if(rm){
+    const si=DO.indexOf(rm[1]),ei=DO.indexOf(rm[2]);
+    if(si!==-1&&ei!==-1){
+      allowed=new Set();
+      if(si<=ei)DO.slice(si,ei+1).forEach(d=>allowed.add(d));
+      else[...DO.slice(si),...DO.slice(0,ei+1)].forEach(d=>allowed.add(d));
+    }
+  }
+  const dayName=DS[new Date(dateStr+'T12:00:00').getDay()];
+  if(!allowed.has(dayName))return`Typically ${deps}`;
+  return null;
+}
+
 function calcSellForProduct(p,pax){
   const{structure,tiers}=p.pricing;
   if(!tiers||!tiers.length)return null;
@@ -845,17 +876,23 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
   );
 }
 // ─── Day item ─────────────────────────────────────────────────────────────────
-function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,heroImg,allProducts,showPricing,dayId,onOverrideChange}){
+function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,heroImg,allProducts,showPricing,dayId,onOverrideChange,isDragging,isDragOver,onItemDragStart,onItemDragOver,onItemDrop,dayDate}){
   const p=findProduct(allProducts,item.productId);
   const[editNote,setEditNote]=useState(false);
   const[noteVal,setNoteVal]=useState(item.notes||"");
   const[showOverrides,setShowOverrides]=useState(false);
   const hasOverrides=item.overrides&&Object.values(item.overrides).some(v=>v);
   if(!p)return null;
+  const availWarning=checkAvailabilityWarning(p,dayDate);
   return(
-    <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,marginBottom:6,overflow:"hidden"}}>
+    <div
+      onDragOver={e=>{e.preventDefault();onItemDragOver&&onItemDragOver(isFirst?0:null);}}
+      onDrop={e=>{e.preventDefault();onItemDrop&&onItemDrop();}}
+      style={{background:C.white,border:`1px solid ${isDragOver?C.teal:C.grey200}`,borderRadius:6,marginBottom:6,overflow:"hidden",opacity:isDragging?0.4:1,transition:"opacity 0.15s,border-color 0.15s"}}>
       {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:50,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>}
+      {availWarning&&<div style={{background:`${C.terra}12`,borderBottom:`1px solid ${C.terra}25`,padding:"3px 10px",display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:11}}>⚠️</span><span style={{fontFamily:F.body,fontSize:10,color:C.terra}}>{availWarning}</span></div>}
       <div style={{display:"flex",gap:8,padding:"8px 10px"}}>
+        <div draggable onDragStart={e=>{e.stopPropagation();onItemDragStart&&onItemDragStart();}} style={{cursor:"grab",color:C.grey400,fontSize:13,flexShrink:0,alignSelf:"flex-start",paddingTop:1,userSelect:"none"}} title="Drag to reorder">⠿</div>
         <div style={{width:3,borderRadius:2,background:typeColor(p.type),flexShrink:0,alignSelf:"stretch"}}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.navy}}>{p.name}</div>
@@ -915,11 +952,17 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
 }
 
 // ─── Day card ─────────────────────────────────────────────────────────────────
-function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onOverrideChange,onRemove,onDuplicate,onMoveDay,isFirstDay,isLastDay}){
+function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onReorderItems,onNoteChange,onOverrideChange,onRemove,onDuplicate,onMoveDay,isFirstDay,isLastDay,onDayDragStart,onDayDragOver,onDayDrop,isDayDragging,isDayDragOver}){
+  const[dragItemFrom,setDragItemFrom]=useState(null);
+  const[dragItemOver,setDragItemOver]=useState(null);
   const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
   return(
-    <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden",marginBottom:14}}>
+    <div
+      onDragOver={e=>{e.preventDefault();onDayDragOver&&onDayDragOver(dayIndex);}}
+      onDrop={e=>{e.preventDefault();onDayDrop&&onDayDrop(dayIndex);}}
+      style={{background:C.white,border:`2px solid ${isDayDragOver?C.teal:C.grey200}`,borderRadius:10,overflow:"hidden",marginBottom:14,opacity:isDayDragging?0.45:1,transition:"opacity 0.15s,border-color 0.15s"}}>
       <div style={{background:C.sandLight,borderBottom:`1px solid ${C.grey200}`,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
+        <div draggable onDragStart={e=>{e.stopPropagation();onDayDragStart&&onDayDragStart(dayIndex);}} onDragEnd={()=>onDayDrop&&onDayDrop(null)} style={{cursor:"grab",color:C.grey400,fontSize:14,padding:"0 2px",flexShrink:0,userSelect:"none"}} title="Drag to reorder day">⠿</div>
         <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase",flexShrink:0}}>DAY {dayIndex+1}</span>
         <input value={day.title} onChange={e=>onUpdate({...day,title:e.target.value})} style={{flex:1,fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,background:"transparent",border:"none",outline:"none"}} placeholder={`Day ${dayIndex+1}`}/>
         <input value={day.location||""} onChange={e=>onUpdate({...day,location:e.target.value})} style={{fontFamily:F.body,fontSize:11,color:C.grey600,background:"transparent",border:"none",outline:"none",width:150}} placeholder="Location..."/>
@@ -941,6 +984,11 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
             onMoveUp={()=>onMoveItem(day.id,idx,-1)}
             onMoveDown={()=>onMoveItem(day.id,idx,1)}
             onNoteChange={(itemId,note)=>onNoteChange(day.id,itemId,note)} dayId={day.id} onOverrideChange={onOverrideChange}
+            isDragging={dragItemFrom===idx} isDragOver={dragItemOver===idx}
+            onItemDragStart={()=>setDragItemFrom(idx)}
+            onItemDragOver={toIdx=>{if(toIdx!==dragItemFrom)setDragItemOver(toIdx);}}
+            onItemDrop={()=>{if(dragItemFrom!=null&&dragItemOver!=null){onReorderItems&&onReorderItems(day.id,dragItemFrom,dragItemOver);}setDragItemFrom(null);setDragItemOver(null);}}
+            dayDate={day.date}
           />
         ))}
         <textarea value={day.dayNotes} onChange={e=>onUpdate({...day,dayNotes:e.target.value})} placeholder="Day overview notes (appears in itinerary)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:36,outline:"none",marginTop:4}}/>
@@ -1808,6 +1856,10 @@ export default function App(){
   const[customProducts,setCPs]=useState(()=>loadCP());
   const[productCosts,setPCosts]=useState(()=>loadPC());
   const[templates,setTemplates]=useState(()=>loadTemplates());
+  const[savedFilter,setSavedFilter]=useState("all");
+  const[showExGST,setShowExGST]=useState(false);
+  const[dragDayFrom,setDragDayFrom]=useState(null);
+  const[dragDayOver,setDragDayOver]=useState(null);
   const[libCat,setLibCat]=useState("All");
   const[libSearch,setLibSrch]=useState("");
   const[showForm,setShowForm]=useState(false);
@@ -1930,6 +1982,8 @@ export default function App(){
   function addItem(dayId,product){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:[...d.items,{id:uid(),productId:product.id,notes:"",overrides:{}}]}:d)}));}
   function removeItem(dayId,itemId){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.filter(i=>i.id!==itemId)}:d)}));}
   function moveItem(dayId,idx,dir){mutate(it=>({...it,days:it.days.map(d=>{if(d.id!==dayId)return d;const items=[...d.items],ni=idx+dir;if(ni<0||ni>=items.length)return d;[items[idx],items[ni]]=[items[ni],items[idx]];return{...d,items};})}));}
+  function reorderItems(dayId,fromIdx,toIdx){if(fromIdx===toIdx)return;mutate(it=>({...it,days:it.days.map(d=>{if(d.id!==dayId)return d;const items=[...d.items];const[moved]=items.splice(fromIdx,1);items.splice(toIdx,0,moved);return{...d,items};})}));}
+  function reorderDays(fromIdx,toIdx){if(fromIdx===toIdx)return;mutate(it=>{const days=[...it.days];const[moved]=days.splice(fromIdx,1);days.splice(toIdx,0,moved);return{...it,days};});}
   function updateNote(dayId,itemId,note){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.map(i=>i.id===itemId?{...i,notes:note}:i)}:d)}));}
   function updateItemOverride(dayId,itemId,field,value){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.map(item=>item.id===itemId?{...item,overrides:{...item.overrides,[field]:value||undefined}}:item)}:d)}));}
 
@@ -2051,19 +2105,61 @@ export default function App(){
       {/* Saved tab */}
       {tab==="saved"&&(
         <div className="no-print" style={{maxWidth:860,margin:"28px auto",padding:"0 18px"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
             <div style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>Saved Itineraries</div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>exportToCSV(itineraries,allProducts)} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"7px 14px"}}>↓ Export CSV</button>
               <button onClick={createNew} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"7px 14px"}}>+ New</button>
             </div>
           </div>
+          {itineraries.length>0&&(()=>{
+            const published=itineraries.filter(i=>i.status==="published");
+            const review=itineraries.filter(i=>i.status==="review");
+            const drafts=itineraries.filter(i=>i.status==="draft");
+            const pubSell=published.reduce((s,i)=>s+estimateItinerarySell(i,allProducts),0);
+            const revSell=review.reduce((s,i)=>s+estimateItinerarySell(i,allProducts),0);
+            const due=itineraries.filter(i=>i.followUpDate&&new Date(i.followUpDate)<=new Date());
+            return(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
+                {[
+                  {label:"Published",count:published.length,sell:pubSell,color:C.terra},
+                  {label:"In Review",count:review.length,sell:revSell,color:C.teal},
+                  {label:"Draft",count:drafts.length,sell:null,color:C.grey400},
+                  {label:"Follow-ups due",count:due.length,sell:null,color:due.length>0?C.terra:C.grey400,alert:due.length>0},
+                ].map(({label,count,sell,color,alert})=>(
+                  <div key={label} style={{background:C.white,border:`1px solid ${alert?color+"60":C.grey200}`,borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3}}>{label}</div>
+                    <div style={{fontFamily:F.heading,fontSize:20,fontWeight:700,color}}>{count}</div>
+                    {sell!=null&&sell>0&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600,marginTop:2}}>${sell.toLocaleString()} est. sell</div>}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          <div style={{display:"flex",gap:6,marginBottom:14}}>
+            {[{k:"all",l:"All"},{k:"followups",l:"Follow-ups"},{k:"published",l:"Published"},{k:"review",l:"In Review"},{k:"draft",l:"Draft"}].map(({k,l})=>(
+              <button key={k} onClick={()=>setSavedFilter(k)} style={{fontFamily:F.body,fontSize:11,fontWeight:savedFilter===k?600:400,color:savedFilter===k?C.white:C.grey600,background:savedFilter===k?C.navy:C.white,border:`1px solid ${savedFilter===k?C.navy:C.grey200}`,borderRadius:5,padding:"4px 12px"}}>{l}</button>
+            ))}
+          </div>
           {itineraries.length===0?(
             <div style={{textAlign:"center",padding:"50px 20px",background:C.white,borderRadius:10,border:`1px solid ${C.grey200}`}}>
               <div style={{fontFamily:F.heading,fontSize:15,color:C.navy,marginBottom:6}}>No itineraries yet</div>
               <button onClick={createNew} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"7px 16px",marginTop:12}}>+ New Itinerary</button>
             </div>
-          ):itineraries.map(it=>(
+          ):(()=>{
+            const today=new Date();
+            const filtered=itineraries.filter(it=>{
+              if(savedFilter==="followups")return it.followUpDate&&new Date(it.followUpDate)<=today;
+              if(savedFilter==="published")return it.status==="published";
+              if(savedFilter==="review")return it.status==="review";
+              if(savedFilter==="draft")return it.status==="draft";
+              return true;
+            }).sort((a,b)=>{
+              if(savedFilter==="followups")return new Date(a.followUpDate)-new Date(b.followUpDate);
+              return new Date(b.updatedAt)-new Date(a.updatedAt);
+            });
+            if(!filtered.length)return<div style={{textAlign:"center",padding:"30px",fontFamily:F.body,fontSize:13,color:C.grey400}}>No itineraries match this filter.</div>;
+            return filtered.map(it=>(
             <div key={it.id} style={{background:C.white,border:`2px solid ${activeId===it.id?C.teal:C.grey200}`,borderRadius:10,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
@@ -2094,7 +2190,7 @@ export default function App(){
                 <button onClick={()=>deleteIt(it.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"5px 10px"}}>Delete</button>
               </div>
             </div>
-          ))}
+          ))})()}
           {/* Product usage tracker */}
           {itineraries.length>0&&(()=>{
             const usage=getProductUsage(itineraries,allProducts).slice(0,8);
@@ -2285,11 +2381,15 @@ export default function App(){
                     {active.days.map((day,di)=>(
                       <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
                         productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
-                        onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem}
+                        onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem} onReorderItems={reorderItems}
                         onNoteChange={updateNote} onOverrideChange={updateItemOverride} onRemove={()=>removeDay(day.id)}
                         onDuplicate={()=>duplicateDay(day.id)}
                         onMoveDay={(dir)=>mutate(it=>{const days=[...it.days];const ni=di+dir;if(ni<0||ni>=days.length)return it;[days[di],days[ni]]=[days[ni],days[di]];return{...it,days};})}
                         isFirstDay={di===0} isLastDay={di===active.days.length-1}
+                        onDayDragStart={fromIdx=>{setDragDayFrom(fromIdx);}}
+                        onDayDragOver={toIdx=>{if(toIdx!==dragDayFrom)setDragDayOver(toIdx);}}
+                        onDayDrop={toIdx=>{if(toIdx==null){setDragDayFrom(null);setDragDayOver(null);return;}if(dragDayFrom!=null&&toIdx!=null)reorderDays(dragDayFrom,toIdx);setDragDayFrom(null);setDragDayOver(null);}}
+                        isDayDragging={dragDayFrom===di} isDayDragOver={dragDayOver===di}
                       />
                     ))}
                     <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
@@ -2405,10 +2505,12 @@ export default function App(){
                 {/* Financials tab — internal only, never exported */}
                 {editTab==="financials"&&(()=>{
                   const pax=active.pax||2;
+                  const gstDiv=showExGST?1.1:1;
                   const rows=active.days.flatMap(d=>d.items.map(item=>{
                     const p=findProduct(allProducts,item.productId);
                     if(!p)return null;
-                    const sell=calcSellForProduct(p,pax);
+                    const sellRaw=calcSellForProduct(p,pax);
+                    const sell=sellRaw!=null?Math.round(sellRaw/gstDiv):null;
                     const costEntry=productCosts[p.id];
                     const cost=calcCostTotal(costEntry,pax);
                     const margin=(sell!=null&&cost!=null)?sell-cost:null;
@@ -2431,6 +2533,12 @@ export default function App(){
                         <label style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Guests</label>
                         <input type="number" min={1} max={20} value={pax} onChange={e=>mutate(it=>({...it,pax:parseInt(e.target.value)||2}))} style={{width:56,fontFamily:F.body,fontSize:13,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",textAlign:"center",outline:"none"}}/>
                         <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Used to estimate per-person and tiered pricing totals</span>
+                        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show ex-GST</span>
+                          <div onClick={()=>setShowExGST(v=>!v)} style={{width:32,height:18,borderRadius:9,background:showExGST?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                            <div style={{position:"absolute",top:3,left:showExGST?14:3,width:12,height:12,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                          </div>
+                        </div>
                       </div>
                       {rows.length===0?(
                         <div style={{fontFamily:F.body,fontSize:13,color:C.grey400,textAlign:"center",padding:"30px 0"}}>No items in this itinerary yet.</div>
