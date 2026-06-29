@@ -752,70 +752,52 @@ function BulkImageUploader({allProducts,productImages,onImagesChange}){
 }
 
 // ─── Library card ─────────────────────────────────────────────────────────────
-function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,onDelete,onDuplicate}){
-  const[open,setOpen]=useState(false);
-  const[imgOpen,setImgOpen]=useState(false);
-  const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
-  const heroImg=images?.[0];
-  return(
-    <div style={{background:C.white,border:`1px solid ${p.custom?C.teal:C.grey200}`,borderRadius:8,overflow:"hidden",marginBottom:8}}>
-      {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:80,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>}
-      <div style={{background:heroImg?"transparent":C.navy,padding:"8px 12px"}}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:4}}>
-          <div>
-            <div style={{fontFamily:F.body,fontSize:9,color:heroImg?C.grey400:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{p.category}{p.custom?" · Custom":""}</div>
-            <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:heroImg?C.navy:C.white,lineHeight:1.2}}>{p.name||"Untitled"}</div>
-          </div>
-          {p.custom&&<div style={{display:"flex",gap:3,flexShrink:0}}><button onClick={onEdit} style={{fontFamily:F.body,fontSize:9,color:C.teal,background:`${C.teal}18`,border:`1px solid ${C.teal}30`,borderRadius:4,padding:"1px 6px"}}>Edit</button><button onClick={onDuplicate} style={{fontFamily:F.body,fontSize:9,color:C.navy,background:`${C.navy}12`,border:`1px solid ${C.navy}30`,borderRadius:4,padding:"1px 6px"}}>Copy</button><button onClick={onDelete} style={{fontFamily:F.body,fontSize:9,color:C.terra,background:`${C.terra}18`,border:`1px solid ${C.terra}30`,borderRadius:4,padding:"1px 6px"}}>Del</button></div>}
-        </div>
-      </div>
-      <div style={{padding:"8px 12px"}}>
-        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
-          {p.category==="Accommodation"?(
-            <>
-              {p.bedrooms&&<Badge xs>{p.bedrooms} bed</Badge>}
-              {p.sleeps&&<Badge xs>Sleeps {p.sleeps}</Badge>}
-              {p.minNights&&<Badge xs>Min {p.minNights} nights</Badge>}
-            </>
-          ):(
-            <>
-              <Badge color={typeColor(p.type)} xs>{p.type==="small_group"?"Small Group":p.type==="component"?"Component":"Private"}</Badge>
-              {p.duration&&<Badge xs>{p.duration}</Badge>}
-              {p.departures&&<Badge xs>{p.departures}</Badge>}
-            </>
+function LibraryCard({p, onAdd, onEdit, onCopy, onDelete}){
+  const [showDetails, setShowDetails] = useState(false);
+  return (
+    <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 10px",marginBottom:6}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:6}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:10,color:C.grey400,textTransform:"uppercase",letterSpacing:"0.06em",fontFamily:F.body,marginBottom:1}}>{p.category}</div>
+          <div style={{fontFamily:F.body,fontWeight:700,fontSize:13,color:C.navy,lineHeight:1.2}}>{p.name}</div>
+          {p.custom&&(
+            <div style={{display:"flex",gap:8,marginTop:2}}>
+              <button onClick={()=>onEdit&&onEdit(p)} style={{background:"none",border:"none",cursor:"pointer",color:C.grey600,fontSize:11,padding:0,textDecoration:"underline"}}>Edit</button>
+              <button onClick={()=>onCopy&&onCopy(p)} style={{background:"none",border:"none",cursor:"pointer",color:C.grey600,fontSize:11,padding:0,textDecoration:"underline"}}>Copy</button>
+              <button onClick={()=>onDelete&&onDelete(p)} style={{background:"none",border:"none",cursor:"pointer",color:C.terra,fontSize:11,padding:0,textDecoration:"underline"}}>Delete</button>
+            </div>
           )}
         </div>
-        {isTiered?<TierTable pricing={p.pricing}/>:<div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra,marginBottom:2}}>{formatPrice(p.pricing)}</div>}
-        {p.pricing.note&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginBottom:4}}>{p.pricing.note}</div>}
-        {open&&(
-          <>
-            {p.description&&<p style={{fontFamily:F.body,fontSize:11,color:C.grey600,lineHeight:1.5,margin:"6px 0"}}>{p.description}</p>}
-            {p.inclusions?.length>0&&<ul style={{listStyle:"none",padding:0,marginBottom:6}}>{p.inclusions.map((inc,i)=><li key={i} style={{fontFamily:F.body,fontSize:10,color:C.grey600,padding:"2px 0 2px 10px",position:"relative"}}><span style={{position:"absolute",left:0,top:6,width:6,height:1,background:C.sand}}/>{inc}</li>)}</ul>}
-            {showInternal&&p.rezdy&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400,background:C.grey100,borderRadius:3,padding:"1px 5px",display:"inline-block",marginBottom:6}}>Rezdy: {p.rezdy}</div>}
-            <div style={{borderTop:`1px solid ${C.grey100}`,paddingTop:8,marginTop:4}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase"}}>Images</span>
-                <button onClick={()=>setImgOpen(v=>!v)} style={{fontFamily:F.body,fontSize:10,color:C.teal,background:"transparent",border:"none",textDecoration:"underline"}}>{imgOpen?"Hide":"Manage"}</button>
-              </div>
-              {imgOpen&&<ImageUploader productId={p.id} images={images} onImagesChange={onImagesChange}/>}
-              {!imgOpen&&(images?.length>0?<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{images.length} image{images.length!==1?"s":""} on Cloudinary</div>:<div style={{fontFamily:F.body,fontSize:10,color:C.grey200}}>No images yet</div>)}
-            </div>
-          </>
-        )}
-        <div style={{display:"flex",gap:6,marginTop:8}}>
-          <button onClick={()=>setOpen(o=>!o)} style={{flex:1,fontFamily:F.body,fontSize:11,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 0"}}>{open?"Less":"Details"}</button>
-          <button onClick={()=>onAdd(p)} style={{flex:1,fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.terra,border:"none",borderRadius:5,padding:"4px 0"}}>+ Add</button>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+          <span style={{background:typeColor(p.type),color:C.white,borderRadius:10,padding:"1px 7px",fontSize:10,fontFamily:F.body,whiteSpace:"nowrap"}}>{p.type==="private"?"Private":p.type==="small_group"?"Small Group":p.type==="component"?"Component":p.type||"Custom"}</span>
+          <div style={{fontSize:12,color:C.terra,fontWeight:600,fontFamily:F.body}}>{formatPrice(p.pricing)}</div>
+          <button onClick={()=>onAdd(p)} style={{background:C.teal,color:C.white,border:"none",borderRadius:4,padding:"3px 10px",fontSize:12,fontFamily:F.body,cursor:"pointer",fontWeight:600}}>+Add</button>
         </div>
       </div>
+      <button onClick={()=>setShowDetails(d=>!d)} style={{background:"none",border:"none",cursor:"pointer",color:C.grey400,fontSize:11,fontFamily:F.body,padding:"4px 0 0 0",textDecoration:"underline"}}>
+        {showDetails?"Hide details":"Details"}
+      </button>
+      {showDetails&&(
+        <div style={{marginTop:6,paddingTop:6,borderTop:`1px solid ${C.grey200}`}}>
+          {p.description&&<div style={{fontSize:12,color:C.grey600,fontFamily:F.body,marginBottom:6,lineHeight:1.5}}>{p.description}</div>}
+          {p.inclusions&&p.inclusions.length>0&&(
+            <ul style={{margin:"0 0 4px 0",padding:"0 0 0 16px"}}>
+              {p.inclusions.map((inc,i)=><li key={i} style={{fontSize:11,color:C.grey600,fontFamily:F.body,marginBottom:2}}>{inc}</li>)}
+            </ul>
+          )}
+          {(p.partner||p.location)&&<div style={{fontSize:11,color:C.grey400,fontFamily:F.body,marginTop:4}}>{[p.partner,p.location].filter(Boolean).join(" · ")}</div>}
+        </div>
+      )}
     </div>
   );
 }
-
 // ─── Day item ─────────────────────────────────────────────────────────────────
-function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,heroImg,allProducts,showPricing}){
+function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,heroImg,allProducts,showPricing,dayId,onOverrideChange}){
   const p=findProduct(allProducts,item.productId);
   const[editNote,setEditNote]=useState(false);
   const[noteVal,setNoteVal]=useState(item.notes||"");
+  const[showOverrides,setShowOverrides]=useState(false);
+  const hasOverrides=item.overrides&&Object.values(item.overrides).some(v=>v);
   if(!p)return null;
   return(
     <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,marginBottom:6,overflow:"hidden"}}>
@@ -839,6 +821,35 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
           ):(
             <button onClick={()=>setEditNote(true)} style={{fontFamily:F.body,fontSize:10,color:C.grey400,background:"transparent",border:"none",padding:"3px 0",textDecoration:"underline"}}>{item.notes?"Edit note":"+ Add note"}</button>
           )}
+          <button onClick={()=>setShowOverrides(o=>!o)} style={{background:"none",border:"none",cursor:"pointer",color:hasOverrides?C.teal:C.grey400,fontSize:11,padding:"2px 0",textDecoration:"underline"}}>
+            {hasOverrides?"✦ Customised for this booking":"Customise for this booking"}
+          </button>
+          {showOverrides&&(
+            <div style={{background:C.sandLight,borderRadius:6,padding:"10px 12px",marginTop:6,display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{fontSize:11,fontWeight:600,color:C.grey600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Override for this itinerary only</div>
+              <div>
+                <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Name</div>
+                <input value={item.overrides?.name||""} onChange={e=>onOverrideChange(dayId,item.id,"name",e.target.value)} placeholder={p.name} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Price display</div>
+                <input value={item.overrides?.priceDisplay||""} onChange={e=>onOverrideChange(dayId,item.id,"priceDisplay",e.target.value)} placeholder={formatPrice(p.pricing)} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Description</div>
+                <textarea value={item.overrides?.description||""} onChange={e=>onOverrideChange(dayId,item.id,"description",e.target.value)} placeholder={p.description||"Add custom description..."} rows={3} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,resize:"vertical",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Inclusions (one per line)</div>
+                <textarea value={item.overrides?.inclusions||""} onChange={e=>onOverrideChange(dayId,item.id,"inclusions",e.target.value)} placeholder={p.inclusions?.join("\n")||"Add inclusions..."} rows={4} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,resize:"vertical",boxSizing:"border-box"}}/>
+              </div>
+              {hasOverrides&&(
+                <button onClick={()=>{onOverrideChange(dayId,item.id,"name","");onOverrideChange(dayId,item.id,"priceDisplay","");onOverrideChange(dayId,item.id,"description","");onOverrideChange(dayId,item.id,"inclusions","");}} style={{background:"none",border:"none",cursor:"pointer",color:C.terra,fontSize:11,textDecoration:"underline",alignSelf:"flex-start"}}>
+                  Reset to product defaults
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
           {!isFirst&&<button onClick={onMoveUp} style={{width:20,height:20,fontSize:11,fontWeight:700,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:3,padding:0,lineHeight:1}}>↑</button>}
@@ -851,7 +862,7 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
 }
 
 // ─── Day card ─────────────────────────────────────────────────────────────────
-function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onRemove,onDuplicate,onMoveDay,isFirstDay,isLastDay}){
+function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,onUpdate,onRemoveItem,onMoveItem,onNoteChange,onOverrideChange,onRemove,onDuplicate,onMoveDay,isFirstDay,isLastDay}){
   const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
   return(
     <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden",marginBottom:14}}>
@@ -876,7 +887,7 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
             onRemove={()=>onRemoveItem(day.id,item.id)}
             onMoveUp={()=>onMoveItem(day.id,idx,-1)}
             onMoveDown={()=>onMoveItem(day.id,idx,1)}
-            onNoteChange={(itemId,note)=>onNoteChange(day.id,itemId,note)}
+            onNoteChange={(itemId,note)=>onNoteChange(day.id,itemId,note)} dayId={day.id} onOverrideChange={onOverrideChange}
           />
         ))}
         <textarea value={day.dayNotes} onChange={e=>onUpdate({...day,dayNotes:e.target.value})} placeholder="Day overview notes (appears in itinerary)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:36,outline:"none",marginTop:4}}/>
@@ -1062,6 +1073,10 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
             {day.items.map(item=>{
               const p=findProduct(allProducts,item.productId);
               if(!p)return null;
+              const ovName=item.overrides?.name||p?.name;
+              const ovDescription=item.overrides?.description||p?.description;
+              const ovInclusions=item.overrides?.inclusions?item.overrides.inclusions.split('\n').filter(l=>l.trim()):p?.inclusions;
+              const ovPriceDisplay=item.overrides?.priceDisplay||null;
               const imgs=productImages[p.id]||[];
               const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
               return(
@@ -1070,7 +1085,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                   <div style={{padding:"12px 14px"}}>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
                       <div>
-                        <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy}}>{p.name}</div>
+                        <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy}}>{ovName}</div>
                         {p.location&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:1}}>{p.location}</div>}
                       </div>
                       {showPrice&&(
@@ -1105,7 +1120,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                               </div>
                             );
                           })():(
-                            <><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{formatPrice(p.pricing)}</div>{isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}</>
+                            <><div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra}}>{ovPriceDisplay||formatPrice(p.pricing)}</div>{isTiered&&<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.pricing.note}</div>}</>
                           )}
                         </div>
                       )}
@@ -1116,14 +1131,14 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                         {p.departures&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.departures}</span>}
                       </div>
                     )}
-                    {p.description&&<p style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.5,marginBottom:8}}>{p.description}</p>}
+                    {ovDescription&&<p style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.5,marginBottom:8}}>{ovDescription}</p>}
                     {item.notes&&<div style={{fontFamily:F.body,fontSize:11,fontStyle:"italic",color:C.navy,background:C.sandLight,borderRadius:5,padding:"6px 10px",marginBottom:8}}>Note: {item.notes}</div>}
                     {showPrice&&isTiered&&p.pricing.tiers?.length>0&&<table style={{borderCollapse:"collapse",marginBottom:8}}><tbody>{p.pricing.tiers.map((t,i)=><tr key={i}><td style={{fontFamily:F.body,fontSize:11,color:C.grey600,padding:"1px 12px 1px 0"}}>{t.label}</td><td style={{fontFamily:F.heading,fontSize:12,color:C.terra,fontWeight:700}}>${(t.retail||0).toLocaleString()}</td></tr>)}</tbody></table>}
-                    {p.inclusions?.length>0&&itinerary.showInclusions!==false&&(
+                    {ovInclusions?.length>0&&itinerary.showInclusions!==false&&(
                       <div>
                         <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:4}}>Included</div>
                         <ul style={{listStyle:"none",padding:0,columns:2,gap:12}}>
-                          {p.inclusions.map((inc,i)=><li key={i} style={{fontFamily:F.body,fontSize:11,color:C.grey600,paddingLeft:10,position:"relative",marginBottom:2,breakInside:"avoid"}}><span style={{position:"absolute",left:0,top:5,width:5,height:1,background:C.teal}}/>{inc}</li>)}
+                          {ovInclusions.map((inc,i)=><li key={i} style={{fontFamily:F.body,fontSize:11,color:C.grey600,paddingLeft:10,position:"relative",marginBottom:2,breakInside:"avoid"}}><span style={{position:"absolute",left:0,top:5,width:5,height:1,background:C.teal}}/>{inc}</li>)}
                         </ul>
                       </div>
                     )}
@@ -1748,6 +1763,7 @@ export default function App(){
   const[activeCurrency,setActiveCurrency]=useState("AUD");
   const[showFxSettings,setShowFxSettings]=useState(false);
   const[dayPicker,setDayPicker]=useState(null); // {product} when open
+  const[sidebarCollapsed,setSidebarCollapsed]=useState(false);
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
 
@@ -1851,10 +1867,11 @@ export default function App(){
   }
   function removeDay(dayId){mutate(it=>({...it,days:it.days.filter(d=>d.id!==dayId)}));}
   function updateDay(d){mutate(it=>({...it,days:it.days.map(x=>x.id===d.id?d:x)}));}
-  function addItem(dayId,product){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:[...d.items,{id:uid(),productId:product.id,notes:""}]}:d)}));}
+  function addItem(dayId,product){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:[...d.items,{id:uid(),productId:product.id,notes:"",overrides:{}}]}:d)}));}
   function removeItem(dayId,itemId){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.filter(i=>i.id!==itemId)}:d)}));}
   function moveItem(dayId,idx,dir){mutate(it=>({...it,days:it.days.map(d=>{if(d.id!==dayId)return d;const items=[...d.items],ni=idx+dir;if(ni<0||ni>=items.length)return d;[items[idx],items[ni]]=[items[ni],items[idx]];return{...d,items};})}));}
   function updateNote(dayId,itemId,note){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.map(i=>i.id===itemId?{...i,notes:note}:i)}:d)}));}
+  function updateItemOverride(dayId,itemId,field,value){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.map(item=>item.id===itemId?{...item,overrides:{...item.overrides,[field]:value||undefined}}:item)}:d)}));}
 
   const filtered=allProducts.filter(p=>{
     const catOk=libCat==="All"||p.category===libCat||(libCat==="Custom"&&p.custom);
@@ -2060,9 +2077,9 @@ export default function App(){
             <Preview itinerary={active} productImages={productImages} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
           </div>
         ):(
-          <div className="no-print" style={{display:"grid",gridTemplateColumns:"300px 1fr",height:"calc(100vh - 84px)",overflow:"hidden"}}>
+          <div className="no-print" style={{display:"flex",height:"calc(100vh - 84px)",overflow:"hidden"}}>
             {/* Library */}
-            <div style={{background:C.white,borderRight:`1px solid ${C.grey200}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{background:C.white,borderRight:`1px solid ${C.grey200}`,display:"flex",flexDirection:"column",overflow:sidebarCollapsed?"hidden":"auto",width:sidebarCollapsed?0:300,minWidth:sidebarCollapsed?0:300,transition:"width 0.25s, min-width 0.25s",flexShrink:0}}>
               <div style={{padding:"10px 12px",borderBottom:`1px solid ${C.grey200}`,background:C.grey100}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
                   <div style={{fontFamily:F.heading,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>Product Library</div>
@@ -2084,22 +2101,29 @@ export default function App(){
                 {showForm&&<ProductForm initial={editProduct} onSave={handleSaveProduct} onCancel={()=>{setShowForm(false);setEditProduct(null);}}/>}
                 {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
                 {filtered.map(p=>(
-                  <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} showInternal={showInternal}
+                  <LibraryCard key={p.id} p={p}
                     onAdd={product=>{
                       if(!active?.days?.length)return;
                       if(active.days.length===1){addItem(active.days[0].id,product);}
                       else{setDayPicker({product});}
                     }}
                     onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
-                    onDuplicate={()=>handleDuplicateProduct(p)}
+                    onCopy={()=>handleDuplicateProduct(p)}
                     onDelete={()=>handleDeleteProduct(p.id)}
                   />
                 ))}
               </div>
             </div>
 
+            <button
+              onClick={()=>setSidebarCollapsed(c=>!c)}
+              title={sidebarCollapsed?"Show product library":"Hide product library"}
+              style={{alignSelf:"center",flexShrink:0,background:C.navy,color:C.white,border:"none",borderRadius:sidebarCollapsed?"0 4px 4px 0":"4px 0 0 4px",width:16,height:48,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",zIndex:5}}
+            >
+              {sidebarCollapsed?"›":"‹"}
+            </button>
             {/* Right panel */}
-            <div style={{display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1,minWidth:0}}>
               {/* Meta bar */}
               <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"8px 14px"}}>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
@@ -2202,7 +2226,7 @@ export default function App(){
                       <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
                         productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
                         onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem}
-                        onNoteChange={updateNote} onRemove={()=>removeDay(day.id)}
+                        onNoteChange={updateNote} onOverrideChange={updateItemOverride} onRemove={()=>removeDay(day.id)}
                         onDuplicate={()=>duplicateDay(day.id)}
                         onMoveDay={(dir)=>mutate(it=>{const days=[...it.days];const ni=di+dir;if(ni<0||ni>=days.length)return it;[days[di],days[ni]]=[days[ni],days[di]];return{...it,days};})}
                         isFirstDay={di===0} isLastDay={di===active.days.length-1}
