@@ -886,7 +886,7 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
   const availWarning=checkAvailabilityWarning(p,dayDate);
   return(
     <div
-      onDragOver={e=>{e.preventDefault();onItemDragOver&&onItemDragOver(isFirst?0:null);}}
+      onDragOver={e=>{e.preventDefault();onItemDragOver&&onItemDragOver();}}
       onDrop={e=>{e.preventDefault();onItemDrop&&onItemDrop();}}
       style={{background:C.white,border:`1px solid ${isDragOver?C.teal:C.grey200}`,borderRadius:6,marginBottom:6,overflow:"hidden",opacity:isDragging?0.4:1,transition:"opacity 0.15s,border-color 0.15s"}}>
       {heroImg&&<img src={heroImg} alt={p.name} style={{width:"100%",height:50,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>}
@@ -986,7 +986,7 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
             onNoteChange={(itemId,note)=>onNoteChange(day.id,itemId,note)} dayId={day.id} onOverrideChange={onOverrideChange}
             isDragging={dragItemFrom===idx} isDragOver={dragItemOver===idx}
             onItemDragStart={()=>setDragItemFrom(idx)}
-            onItemDragOver={toIdx=>{if(toIdx!==dragItemFrom)setDragItemOver(toIdx);}}
+            onItemDragOver={()=>{if(idx!==dragItemFrom)setDragItemOver(idx);}}
             onItemDrop={()=>{if(dragItemFrom!=null&&dragItemOver!=null){onReorderItems&&onReorderItems(day.id,dragItemFrom,dragItemOver);}setDragItemFrom(null);setDragItemOver(null);}}
             dayDate={day.date}
           />
@@ -1833,7 +1833,7 @@ function EmailDraftButton({itinerary,allProducts,productImages,activeCurrency,fx
 
 // ─── Status ───────────────────────────────────────────────────────────────────
 const SC={draft:C.grey400,review:C.teal,published:C.terra};
-const SL={draft:"Draft",review:"In Review",published:"Published"};
+const SL={draft:"Enquiry",review:"Proposal",published:"Confirmed"};
 
 // ─── Edit tabs ────────────────────────────────────────────────────────────────
 const EDIT_TABS=[
@@ -2122,9 +2122,9 @@ export default function App(){
             return(
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
                 {[
-                  {label:"Published",count:published.length,sell:pubSell,color:C.terra},
-                  {label:"In Review",count:review.length,sell:revSell,color:C.teal},
-                  {label:"Draft",count:drafts.length,sell:null,color:C.grey400},
+                  {label:"Confirmed",count:published.length,sell:pubSell,color:C.terra},
+                  {label:"Proposal",count:review.length,sell:revSell,color:C.teal},
+                  {label:"Enquiry",count:drafts.length,sell:null,color:C.grey400},
                   {label:"Follow-ups due",count:due.length,sell:null,color:due.length>0?C.terra:C.grey400,alert:due.length>0},
                 ].map(({label,count,sell,color,alert})=>(
                   <div key={label} style={{background:C.white,border:`1px solid ${alert?color+"60":C.grey200}`,borderRadius:8,padding:"10px 14px"}}>
@@ -2137,7 +2137,7 @@ export default function App(){
             );
           })()}
           <div style={{display:"flex",gap:6,marginBottom:14}}>
-            {[{k:"all",l:"All"},{k:"followups",l:"Follow-ups"},{k:"published",l:"Published"},{k:"review",l:"In Review"},{k:"draft",l:"Draft"}].map(({k,l})=>(
+            {[{k:"all",l:"All"},{k:"followups",l:"Follow-ups"},{k:"published",l:"Confirmed"},{k:"review",l:"Proposal"},{k:"draft",l:"Enquiry"}].map(({k,l})=>(
               <button key={k} onClick={()=>setSavedFilter(k)} style={{fontFamily:F.body,fontSize:11,fontWeight:savedFilter===k?600:400,color:savedFilter===k?C.white:C.grey600,background:savedFilter===k?C.navy:C.white,border:`1px solid ${savedFilter===k?C.navy:C.grey200}`,borderRadius:5,padding:"4px 12px"}}>{l}</button>
             ))}
           </div>
@@ -2304,7 +2304,7 @@ export default function App(){
                       statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
                     }));
                   }} style={{...fi,color:SC[active.status],fontWeight:600}}>
-                    <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
+                    <option value="draft">Enquiry</option><option value="review">Proposal</option><option value="published">Confirmed</option>
                   </select>
                   <div style={{display:"flex",alignItems:"center",gap:4,background:C.sandLight,borderRadius:5,padding:"3px 8px",flexShrink:0}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em"}}>{active.ceRef||"—"}</span>
