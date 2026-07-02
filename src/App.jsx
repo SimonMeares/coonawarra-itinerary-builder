@@ -90,7 +90,61 @@ const BUILT_IN_PRODUCTS = [
   {id:"p-warrawindi-farm",rezdy:null,category:"Experience Components",name:"Warrawindi Farm Experience",subtitle:"45-minute guided farm drive · Warrawindi Escapes",type:"component",duration:"45 mins",departures:"On request",location:"Warrawindi Escapes, Penola",minGuests:null,maxGuests:null,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:85}],note:null},tags:["Farm","Wildlife","Sustainability"],description:"A 45-minute guided drive through Warrawindi Farms — a fourth-generation working property shaped by the same family for generations. See cattle and sheep up close, encounter native kangaroos and emus grazing in the paddocks, and hear the story of how this land has been farmed sustainably across more than a century. An ideal introduction to authentic Australian farm life for guests staying at Warrawindi.",inclusions:["45-minute guided drive through Warrawindi Farms","Encounter with cattle, sheep, kangaroos and native wildlife","Fourth-generation family farm history and regional commentary","Insight into sustainable and regenerative farming practices"]},
   {id:"p-warrawindi-exclusive",rezdy:null,category:"Experience Components",name:"Exclusive Farm Experience",subtitle:"3-hour private farm and nature tour · Warrawindi Escapes",type:"component",duration:"3 hrs",departures:"On request",location:"Warrawindi Escapes, Penola",minGuests:null,maxGuests:null,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:260}],note:null},tags:["Farm","Wildlife","Sustainability","Nature"],description:"A three-hour private guided tour through the landscapes of Warrawindi Farms, combining hands-on farm experience with genuine insight into sustainable and regenerative farming practices. The tour moves through diverse environments — paddocks, bushland and natural habitats — with morning tea served somewhere special out on the property. An unhurried, immersive encounter with authentic Australian farm life.",inclusions:["Three-hour private guided farm and nature tour","Sustainable and regenerative farming insight throughout","Morning tea served at a special location on the property","Wildlife encounters — kangaroos, emus, native birds and farm animals"]},
   {id:"p-warrawindi-sunset",rezdy:null,category:"Experience Components",name:"Farm Sunset & Stars Experience",subtitle:"Farm tour, sunset dinner & stargazing · Warrawindi Escapes",type:"component",duration:"Evening",departures:"On request",location:"Warrawindi Escapes, Penola",minGuests:null,maxGuests:null,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:300}],note:null},tags:["Farm","Wildlife","Dining","Sunset","Stargazing"],description:"An evening that moves from the paddocks to the stars. A farm tour takes you into the working heart of Warrawindi — sustainable farming methods, friendly animals and fascinating wildlife — before the group settles at a secluded location on the property to watch the sun go down. As the sky darkens, dinner is served: homegrown meats, a generous grazing board, local wines, beer and non-alcoholic beverages. The night closes around an open fire with marshmallows under a full country sky.",inclusions:["Farm tour — sustainable farming methods, farm animals and native wildlife","Sunset at a secluded location on the Warrawindi property","Dinner featuring homegrown meats and a grazing board with local produce","Local wines, beer and non-alcoholic beverages","Marshmallow roast around the fire under the stars"]},
+  {id:"p-naracoorte-caves",rezdy:null,category:"Experience Components",name:"Victoria Fossil Cave",subtitle:"UNESCO World Heritage guided tour · Naracoorte Caves National Park",type:"component",duration:"1 hr 15 mins",departures:"10:15 AM daily",location:"Naracoorte Caves National Park",minGuests:null,maxGuests:null,pricing:{structure:"component",tiers:[],note:"Included in select tours and packages"},tags:["Caves","Heritage","Wildlife"],description:"Deep beneath the South Australian countryside, the Victoria Fossil Cave holds one of the most remarkable prehistoric records in the southern hemisphere. In 1969, two explorers squeezed through a narrow gap and discovered a vast chamber filled with the fossilised remains of thousands of animals — a natural pitfall trap that had been accumulating bones for over 200,000 years. Today it is part of the UNESCO World Heritage–listed Naracoorte Caves National Park and remains an active palaeontological dig site. A guided tour moves through magnificent speleothem chambers — stalactites, stalagmites and helictites — before settling in the Fossil Chamber, where the story of Australia's lost megafauna comes to life: giant kangaroos, marsupial lions and creatures that vanished from this landscape tens of thousands of years ago. The science here is still unfolding — researchers continue to excavate and catalogue discoveries that rewrite our understanding of prehistoric Australia.",inclusions:["Guided tour of Victoria Fossil Cave, UNESCO World Heritage–listed Naracoorte Caves National Park","Walk through magnificent speleothem chambers — stalactites, stalagmites and helictites","Time in the Fossil Chamber — the site of an ongoing palaeontological excavation","Expert commentary on Australia's prehistoric megafauna — giant kangaroos, marsupial lions and more","Entry to the Wonambi Fossil Centre included"]},
+  {id:"p-railway-siding",rezdy:null,category:"Experience Components",name:"Coonawarra Railway Siding",subtitle:"A landmark in the story of Coonawarra wine",type:"component",duration:null,departures:null,location:"Coonawarra",minGuests:null,maxGuests:null,pricing:{structure:"component",tiers:[],note:"Included in select tours and packages"},tags:["Heritage","Wine","History"],description:"A brief stop at a place that carries far more meaning than its modest appearance suggests. The Coonawarra Railway Siding was the artery through which the region's first wines reached the world — without it, Coonawarra as we know it today may never have existed. Built in the late 1800s to service the growing pastoral and viticultural industries of the region, it stands today as a quiet but powerful reminder of the vision, determination and hard work of the people who shaped this landscape. Simon shares the story of the siding and its place in the history of the region — one of those moments that gives everything else in the day a deeper context, and the wines you taste afterwards a richer meaning.",inclusions:["Guided stop at the historic Coonawarra Railway Siding","Stories of the region's founding and the role of rail in establishing Coonawarra as a celebrated wine address"]},
 ];
+
+// ─── Sample itineraries ───────────────────────────────────────────────────────
+function buildSamples(){
+  return[{
+    id:"sample_warrawindi_2n",ceRef:"SAMPLE-001",rezdyRef:"",
+    title:"Two-Night Limestone Coast Experience",
+    clientName:"",clientEmail:"",guestCount:2,
+    arrivalDate:"",departureDate:"",origin:"",
+    status:"draft",totalPrice:"",expiryDate:"",bookByDate:"",
+    showPricing:false,tradeMode:false,commission:20,printFlow:false,
+    agentLogo:"",agentName:"",agentRef:"",
+    intro:"This itinerary has been prepared exclusively for you by Coonawarra Experiences. It is designed to immerse you in the very best of South Australia's Limestone Coast — from the ancient world beneath the ground to the celebrated wine country above it, and a private farm that reminds you what it feels like to truly slow down.",
+    hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they have built with the region's people, places and producers.",
+    welcomeMessage:"",emailIntro:"",
+    beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
+    terms:DEFAULT_TERMS,notes:"",
+    coverImage:"",attachments:[],
+    guestInfo:{name1:"",name2:"",email:"",phone:"",country:"",dietary:"",medical:"",celebrating:"",notes:""},
+    internalNotes:"Sample itinerary — Warrawindi Escapes, The Brolga · 2 nights, 1 hosted touring day",
+    showInclusions:true,followUpDate:"",statusHistory:[],
+    days:[
+      {
+        id:"s_w2n_d1",title:"Check In to Your Luxury Retreat",date:"",location:"Warrawindi Escapes, Penola",
+        dayNotes:"Your Limestone Coast journey begins the moment you turn into Warrawindi. A bottle of premium Coonawarra wine and artisan chocolate will be waiting at The Brolga — pour a glass, step out onto the deck and let the quiet of the property settle around you. This is a 3,000-acre working farm, and the stillness here is something most travellers do not expect. This evening, as the light softens over the paddocks, your hosts at Warrawindi will lead you out onto the property for one of the most memorable evenings the Limestone Coast has to offer.",
+        internalNotes:"",
+        items:[
+          {id:"s_w2n_d1_i1",productId:"p-brolga",notes:"Welcome wine and artisan chocolate on arrival. A freshly prepared roast dinner will be delivered to your retreat this evening.",overrides:{}},
+          {id:"s_w2n_d1_i2",productId:"p-warrawindi-sunset",notes:"5:00 PM — Farm tour, open fire dinner and stargazing on the Warrawindi property",overrides:{}},
+        ]
+      },
+      {
+        id:"s_w2n_d2",title:"Your Privately Hosted Limestone Coast Day",date:"",location:"Naracoorte · Coonawarra · Penola",
+        dayNotes:"Simon is at The Brolga at 9:00 AM. From here, the day takes you underground into prehistory, through the winemaking heart of the Limestone Coast and into places not found on any public map. Allow the day to unfold at its own pace — there is no need to rush anything. You will be back at Warrawindi by around 5:15 PM.",
+        internalNotes:"",
+        items:[
+          {id:"s_w2n_d2_i1",productId:"p-naracoorte-caves",notes:"10:15 AM – 11:30 AM · Pick-up from The Brolga at 9:00 AM — approximately 45 minutes to Naracoorte",overrides:{}},
+          {id:"s_w2n_d2_i2",productId:"p-ottelia",notes:"12:30 PM · Seasonal set-menu lunch featuring the finest produce of the Limestone Coast",overrides:{}},
+          {id:"s_w2n_d2_i3",productId:"p-railway-siding",notes:"2:00 PM · A brief stop at the symbolic heart of Coonawarra wine country",overrides:{}},
+          {id:"s_w2n_d2_i4",productId:"p-wynns",notes:"2:15 PM · Icon tasting and private cellar tour inside the historic 1896 Gables winery",overrides:{}},
+          {id:"s_w2n_d2_i5",productId:"p-confido",notes:"3:30 PM · Hosted by the producers in their working olive grove",overrides:{}},
+          {id:"s_w2n_d2_i6",productId:"p-kangaroo-sanctuary",notes:"4:30 PM · Return to The Brolga approximately 5:15 PM",overrides:{}},
+        ]
+      },
+      {
+        id:"s_w2n_d3",title:"Farewell from the Limestone Coast",date:"",location:"Warrawindi Escapes, Penola",
+        dayNotes:"Take your time this morning. Enjoy a relaxed breakfast with the provisions in your retreat, and if the mood takes you, a last wander around the property before you pack up. The farm is worth one more quiet look.\n\nThank you for choosing to spend time with us on the Limestone Coast. It has been a genuine pleasure having you here, and we hope the past few days have given you a real feel for why this region holds such a special place in our hearts.\n\nSafe travels on your onward journey — wherever the road takes you next. We hope it will not be long before the Limestone Coast calls you back.\n\nWith warm wishes,\nSimon and Kerry Meares\nCoonawarra Experiences",
+        internalNotes:"",items:[]
+      },
+    ],
+    createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+  }];
+}
 
 const CATS=["All","Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Accommodation","Custom"];
 const CAT_S={"All":"All","Day Tours":"Day Tours","Stay & Tour Packages":"Packages","Transfers & Journeys":"Transfers","Experience Components":"Components","Accommodation":"Stays","Custom":"Custom"};
@@ -1854,7 +1908,7 @@ export default function App(){
   const[bView,setBView]=useState("edit");
   const[editTab,setEditTab]=useState("itinerary");
   const[showInternal,setSI]=useState(false);
-  const[itineraries,setIts]=useState(()=>loadIts());
+  const[itineraries,setIts]=useState(()=>{const stored=loadIts();if(stored.length>0)return stored;const samples=buildSamples();saveIts(samples);return samples;});
   const[activeId,setActiveId]=useState(null);
   const[productImages,setPImgs]=useState(()=>loadImgs());
   const[customProducts,setCPs]=useState(()=>loadCP());
