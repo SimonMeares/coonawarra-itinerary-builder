@@ -563,8 +563,7 @@ input,textarea,select,button{font-family:inherit;}
   .glance-block{padding:10px 14px!important;margin-bottom:10px!important;break-inside:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;page-break-before:avoid!important;}
   .glance-block>div:first-child{margin-bottom:8px!important;}
   .glance-row{padding-bottom:6px!important;margin-bottom:6px!important;}
-  .last-page-wrap{break-before:page!important;page-break-before:always!important;}
-  .doc-footer{position:fixed!important;bottom:3mm!important;left:25mm!important;right:25mm!important;break-inside:avoid!important;}
+  .doc-footer{margin-top:24mm!important;break-inside:avoid!important;page-break-inside:avoid!important;}
 }
 `;
 
@@ -1617,10 +1616,9 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
         </div>
       )}
 
-      {/* Terms, Attachments & Footer — last page */}
-      <div className="last-page-wrap">
+      {/* Terms & Conditions — banner + content on same page */}
       {itinerary.terms&&(
-        <div style={{marginBottom:20}}>
+        <div className="print-break" style={{marginBottom:20}}>
           <div className="no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
             <div>
               <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
@@ -1659,7 +1657,6 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
         </div>
         {itinerary.notes&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid rgba(255,255,255,0.12)`,fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.5)"}}>{itinerary.notes}</div>}
       </div>
-      </div>{/* end last-page-wrap */}
     </div>
   );
 }
