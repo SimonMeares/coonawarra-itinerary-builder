@@ -505,6 +505,7 @@ input,textarea,select,button{font-family:inherit;}
   @page{margin:15mm 12mm;size:A4;}
   @page :first{margin:0;}
   .preview-wrapper{padding:0!important;}
+  .exp-card{overflow:visible!important;break-inside:avoid!important;page-break-inside:avoid!important;}
   .print-page-num::after{content:counter(page);}
   body{counter-reset:page;}
   .print-break{counter-increment:page;}
@@ -1134,7 +1135,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       {/* Cover — trade and guest have separate layouts */}
       {isTrade?(
         /* ── TRADE COVER ── */
-        <div className="cover-page" style={{background:C.navy,borderRadius:10,marginBottom:16,position:"relative",overflow:"hidden"}}>
+        <div style={{background:C.navy,borderRadius:10,marginBottom:16,position:"relative",overflow:"hidden"}}>
           {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",opacity:0.12,display:"block"}} crossOrigin="anonymous"/>}
           <div style={{position:"relative",padding:"28px 32px"}}>
             {/* CE logo + agent logo row */}
@@ -1194,7 +1195,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         </div>
       ):(
         /* ── GUEST COVER — brand design: navy header + cream body ── */
-        <div className="no-print-border cover-page" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
+        <div className="no-print-border" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
           {/* Navy header strip with logo */}
           <div style={{background:C.navy,padding:"22px 32px"}}>
             <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:72,width:"auto",display:"block"}} crossOrigin="anonymous"/>
@@ -1281,7 +1282,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       {itinerary.days.map((day,di)=>{
         const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
         return(
-          <div key={day.id} className={di>0&&!itinerary.printFlow?"print-break":""} style={{marginBottom:20}}>
+          <div key={day.id} className={!itinerary.printFlow?"print-break":""} style={{marginBottom:20}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
               <span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase"}}>DAY {di+1}</span>
               <div style={{flex:1}}>
@@ -1303,7 +1304,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
               const imgs=productImages[p.id]||[];
               const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
               return(
-                <div key={item.id} style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,overflow:"hidden",marginBottom:18,borderLeft:`4px solid ${typeColor(p.type)}`,breakInside:"avoid",pageBreakInside:"avoid",WebkitColumnBreakInside:"avoid"}}>
+                <div key={item.id} className="exp-card" style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,overflow:"hidden",marginBottom:18,borderLeft:`4px solid ${typeColor(p.type)}`,breakInside:"avoid",pageBreakInside:"avoid",WebkitColumnBreakInside:"avoid"}}>
                   {imgs.length>0&&<ImageStrip images={imgs}/>}
                   <div style={{padding:"12px 14px"}}>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
