@@ -498,11 +498,11 @@ input,textarea,select,button{font-family:inherit;}
 @media print{
   .no-print{display:none!important;}
   body{background:white;margin:0;padding:0;}
-  .print-break{page-break-before:always;break-before:page;}
+  .print-break{page-break-before:always;break-before:page;padding-top:8mm;}
   .cover-page{page-break-after:always;break-after:page;}
   .divider-page{page-break-before:always;page-break-after:always;break-before:page;break-after:page;}
   img{break-inside:avoid;page-break-inside:avoid;}
-  @page{margin:15mm 12mm;size:A4;}
+  @page{margin:20mm 14mm;size:A4;}
   @page :first{margin:0;}
   .preview-wrapper{padding:0!important;}
   .exp-card{overflow:visible!important;break-inside:avoid!important;page-break-inside:avoid!important;}
