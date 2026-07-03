@@ -563,8 +563,8 @@ input,textarea,select,button{font-family:inherit;}
   .glance-block{padding:10px 14px!important;margin-bottom:10px!important;break-inside:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;page-break-before:avoid!important;}
   .glance-block>div:first-child{margin-bottom:8px!important;}
   .glance-row{padding-bottom:6px!important;margin-bottom:6px!important;}
-  .last-page-wrap{break-before:page!important;page-break-before:always!important;display:flex!important;flex-direction:column!important;min-height:257mm!important;}
-  .doc-footer{margin-top:auto!important;break-inside:avoid!important;page-break-inside:avoid!important;}
+  .last-page-wrap{break-before:page!important;page-break-before:always!important;}
+  .doc-footer{position:fixed!important;bottom:3mm!important;left:25mm!important;right:25mm!important;break-inside:avoid!important;}
 }
 `;
 
