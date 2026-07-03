@@ -2341,7 +2341,7 @@ export default function App(){
       const arrayBuffer=await pdfCompressFile.arrayBuffer();
       const pdfDoc=await PDFDocument.load(arrayBuffer,{ignoreEncryption:true,updateMetadata:false});
 
-      // Collect image XObjects — scan via page resources AND global enumeration
+      // Collect image XObjects via page resources (handles Form XObjects) + global enumeration
       const imageSet=new Set();
       const scanDict=(dict)=>{
         if(!dict||!dict.get)return;
@@ -2365,12 +2365,12 @@ export default function App(){
         try{if(obj?.dict?.get&&obj.dict.get(PDFName.of("Subtype"))?.toString()==="/Image")imageSet.add(obj);}catch(e){}
       }
       const imageObjects=[...imageSet];
-      setPdfCompressProgress(`Found ${imageObjects.length} image${imageObjects.length!==1?"s":""} — compressing...`);
+      setPdfCompressProgress("Found "+imageObjects.length+" image"+(imageObjects.length!==1?"s":"")+" — compressing...");
       await new Promise(r=>setTimeout(r,80));
 
       if(imageObjects.length===0){
         setPdfCompressDone(true);
-        setPdfCompressProgress("No images detected. Open browser console (F12) after your next attempt to see diagnostic info.");
+        setPdfCompressProgress("No images detected. Open browser console (F12) for diagnostic info.");
         setPdfCompressing(false);return;
       }
 
@@ -2386,10 +2386,10 @@ export default function App(){
         const isJpeg=filter.includes("DCTDecode");
         const isFlate=filter.includes("FlateDecode");
         if(!isJpeg&&!isFlate){
-          console.log(`[PDF] Image ${idx+1} ${w}x${h} filter="${filter}" — skipped (not JPEG/Flate)`);
+          console.log("[PDF] img "+(idx+1)+" "+w+"x"+h+" filter="+filter+" skipped");
           continue;
         }
-        setPdfCompressProgress(`Compressing image ${idx+1} of ${imageObjects.length} (${w}\u00d7${h})...`);
+        setPdfCompressProgress("Compressing image "+(idx+1)+" of "+imageObjects.length+" ("+w+"×"+h+")...");
         await new Promise(r=>setTimeout(r,0));
         try{
           const canvas=document.createElement("canvas");
@@ -2400,7 +2400,7 @@ export default function App(){
             try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});ctx.drawImage(img,0,0);}
             finally{URL.revokeObjectURL(url);}
           }else{
-            let raw;try{raw=pako.inflate(contents);}catch(e){console.log(`[PDF] pako.inflate failed on image ${idx+1}`,e);continue;}
+            let raw;try{raw=pako.inflate(contents);}catch(e){console.log("[PDF] pako fail img "+(idx+1),e);continue;}
             const len=raw.length;
             let ch=0,usePred=false;
             if(len===h*(w*3+1)){ch=3;usePred=true;}
@@ -2409,7 +2409,7 @@ export default function App(){
             else if(len===h*w*3){ch=3;}
             else if(len===h*w*4){ch=4;}
             else if(len===h*w){ch=1;}
-            else{console.log(`[PDF] Image ${idx+1} ${w}x${h} raw=${len} expected≈${h*w*3} — layout unknown, skipping`);continue;}
+            else{console.log("[PDF] img "+(idx+1)+" "+w+"x"+h+" raw="+len+" exp="+h*w*3+" layout unknown");continue;}
             const px=usePred?reversePngPredictor(raw,w,h,ch):raw;
             const id=ctx.createImageData(w,h);
             for(let i=0;i<w*h;i++){
@@ -2428,9 +2428,9 @@ export default function App(){
             obj.dict.set(PDFName.of("Length"),pdfDoc.context.obj(newBytes.length));
             try{obj.dict.delete(PDFName.of("DecodeParms"));}catch(e){}
             replaced++;
-            console.log(`[PDF] Image ${idx+1} ${w}x${h}: ${Math.round(contents.length/1024)}KB -> ${Math.round(newBytes.length/1024)}KB`);
+            console.log("[PDF] img "+(idx+1)+" "+w+"x"+h+": "+Math.round(contents.length/1024)+"KB -> "+Math.round(newBytes.length/1024)+"KB");
           }
-        }catch(e){console.warn(`[PDF] Image ${idx+1} error:`,e);}
+        }catch(e){console.warn("[PDF] img "+(idx+1)+" error:",e);}
       }
       setPdfCompressProgress("Saving...");
       const compressedBytes=await pdfDoc.save({useObjectStreams:true});
@@ -2440,13 +2440,13 @@ export default function App(){
       const outBlob=new Blob([compressedBytes],{type:"application/pdf"});
       const outUrl=URL.createObjectURL(outBlob);
       const a=document.createElement("a");a.href=outUrl;
-      a.download=`${pdfCompressFile.name.replace(/\.pdf$/i,"")}_${preset.id}.pdf`;
+      a.download=pdfCompressFile.name.replace(/\.pdf$/i,"")+"_"+preset.id+".pdf";
       a.click();URL.revokeObjectURL(outUrl);
       setPdfCompressDone(true);
-      setPdfCompressProgress(`${origMB} MB \u2192 ${newMB} MB \u00b7 ${pct}% smaller \u00b7 ${replaced} of ${imageObjects.length} image${imageObjects.length!==1?"s":""} compressed`);
+      setPdfCompressProgress(origMB+" MB → "+newMB+" MB · "+pct+"% smaller · "+replaced+" of "+imageObjects.length+" image"+(imageObjects.length!==1?"s":"")+" compressed");
     }catch(err){
       setPdfCompressProgress("Error: "+err.message);
-      console.error("[PDF Compress error]",err);
+      console.error("[PDF Compress]",err);
     }finally{
       setPdfCompressing(false);
     }
@@ -2691,5 +2691,330 @@ export default function App(){
                   {it.followUpDate&&new Date(it.followUpDate)<=new Date()&&<span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.white,background:C.terra,borderRadius:4,padding:"1px 6px"}}>Follow up due</span>}
                   {it.clientName&&<span>{it.clientName}</span>}
                   <span>{it.days.length} {it.days.length===1?"day":"days"}</span>
-                  {it.arrivalDate&&<span>Arrives {fmtDate(it.arrivalDate)}</span>}
-                  <span>Updated {new Date(it.updatedAt).toLocaleDateString("en-AU")}<
+                  <span>Updated {new Date(it.updatedAt).toLocaleDateString("en-AU")}</span>
+                  {it.statusHistory?.length>1&&<span style={{color:C.grey400}}>· {it.statusHistory.length} status changes</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:5,flexShrink:0}}>
+                <button onClick={()=>{
+                  // Backfill CE ref if missing
+                  if(!it.ceRef){
+                    const ref=generateCERef(itineraries.filter(i=>i.id!==it.id));
+                    const next=itineraries.map(i=>i.id===it.id?{...i,ceRef:ref}:i);
+                    setIts(next);saveIts(next);
+                  }
+                  setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");
+                }} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"5px 12px"}}>Open</button>
+                <button onClick={()=>dupIt(it)} style={{fontFamily:F.body,fontSize:11,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 10px"}}>Copy</button>
+                <button onClick={()=>deleteIt(it.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"5px 10px"}}>Delete</button>
+              </div>
+            </div>
+          ))}
+          {/* Product usage tracker */}
+          {itineraries.length>0&&(()=>{
+            const usage=getProductUsage(itineraries,allProducts).slice(0,8);
+            if(!usage.length)return null;
+            return(
+              <div style={{marginTop:28}}>
+                <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12}}>Most used products</div>
+                <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden"}}>
+                  {usage.map((p,i)=>(
+                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderBottom:i<usage.length-1?`1px solid ${C.grey100}`:"none"}}>
+                      <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra,width:24,textAlign:"center",flexShrink:0}}>{p.usageCount}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.category}</div>
+                      </div>
+                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.usageCount} itinerar{p.usageCount===1?"y":"ies"}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Builder tab */}
+      {tab==="builder"&&(
+        !active?(
+          <div style={{textAlign:"center",padding:"70px 20px"}}>
+            <div style={{fontFamily:F.heading,fontSize:18,color:C.navy,marginBottom:6}}>No itinerary open</div>
+            <div style={{fontFamily:F.body,fontSize:13,color:C.grey400,marginBottom:18}}>Create a new itinerary or open a saved one.</div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={createNew} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:6,padding:"9px 22px"}}>+ New Itinerary</button>
+              <button onClick={()=>setTab("saved")} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"9px 22px"}}>Open Saved</button>
+              <button onClick={()=>setShowTM(true)} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"9px 22px"}}>📋 Use Template</button>
+            </div>
+          </div>
+        ):bView==="preview"?(
+          <div style={{padding:"20px 18px"}}>
+            <Preview itinerary={active} productImages={productImages} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
+          </div>
+        ):(
+          <div className="no-print" style={{display:"grid",gridTemplateColumns:"300px 1fr",height:"calc(100vh - 84px)",overflow:"hidden"}}>
+            {/* Library */}
+            <div style={{background:C.white,borderRight:`1px solid ${C.grey200}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+              <div style={{padding:"10px 12px",borderBottom:`1px solid ${C.grey200}`,background:C.grey100}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
+                  <div style={{fontFamily:F.heading,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>Product Library</div>
+                  <div style={{display:"flex",gap:4}}>
+                    <BulkImageUploader allProducts={allProducts} productImages={productImages} onImagesChange={handleImagesChange}/>
+                    <button onClick={()=>{setShowForm(true);setEditProduct(null);setLibCat("Custom");}} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
+                  </div>
+                </div>
+                <input value={libSearch} onChange={e=>setLibSrch(e.target.value)} placeholder="Search products..." style={{width:"100%",fontFamily:F.body,fontSize:12,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 9px",outline:"none",background:C.white,marginBottom:7}}/>
+                <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                  {CATS.map(cat=>(
+                    <button key={cat} onClick={()=>{setLibCat(cat);setShowForm(false);}} style={{fontFamily:F.body,fontSize:9,fontWeight:libCat===cat?700:400,color:libCat===cat?C.white:C.grey600,background:libCat===cat?C.navy:"transparent",border:libCat===cat?"none":`1px solid ${C.grey200}`,borderRadius:10,padding:"2px 7px"}}>
+                      {CAT_S[cat]}{cat==="Custom"?` (${customProducts.length})`:""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{flex:1,overflowY:"auto",padding:8}}>
+                {showForm&&<ProductForm initial={editProduct} onSave={handleSaveProduct} onCancel={()=>{setShowForm(false);setEditProduct(null);}}/>}
+                {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
+                {filtered.map(p=>(
+                  <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} showInternal={showInternal}
+                    onAdd={product=>{
+                      if(!active?.days?.length)return;
+                      if(active.days.length===1){addItem(active.days[0].id,product);}
+                      else{setDayPicker({product});}
+                    }}
+                    onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
+                    onDuplicate={()=>handleDuplicateProduct(p)}
+                    onDelete={()=>handleDeleteProduct(p.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Right panel */}
+            <div style={{display:"flex",flexDirection:"column",overflow:"hidden"}}>
+              {/* Meta bar */}
+              <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"8px 14px"}}>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
+                  <input value={active.title} onChange={e=>mutate(it=>({...it,title:e.target.value}))} style={{fontFamily:F.heading,fontSize:15,fontWeight:700,color:C.navy,border:"none",outline:"none",background:"transparent",flex:"1 1 180px",minWidth:0}} placeholder="Itinerary title"/>
+                  <div style={{position:"relative"}}>
+                    <input value={active.clientName} onChange={e=>{
+                      mutate(it=>({...it,clientName:e.target.value}));
+                    }} placeholder="Client name" style={{...fi,width:140}}
+                    list="past-clients"/>
+                    <datalist id="past-clients">
+                      {[...new Set(itineraries.filter(i=>i.id!==activeId&&i.clientName).map(i=>i.clientName))].map(name=>(
+                        <option key={name} value={name}/>
+                      ))}
+                    </datalist>
+                  </div>
+                  <input value={active.clientEmail} onChange={e=>mutate(it=>({...it,clientEmail:e.target.value}))} placeholder="Client email" style={{...fi,width:180}}/>
+                  <input type="number" value={active.guestCount} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||2}))} min={1} max={20} title="Guests" style={{...fi,width:55}}/>
+                  <input value={active.origin} onChange={e=>mutate(it=>({...it,origin:e.target.value}))} placeholder="Origin" style={{...fi,width:110}}/>
+                  <select value={active.status} onChange={e=>{
+                    const newStatus=e.target.value;
+                    mutate(it=>({...it,status:newStatus,
+                      statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
+                    }));
+                  }} style={{...fi,color:SC[active.status],fontWeight:600}}>
+                    <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
+                  </select>
+                  <div style={{display:"flex",alignItems:"center",gap:4,background:C.sandLight,borderRadius:5,padding:"3px 8px",flexShrink:0}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em"}}>{active.ceRef||"—"}</span>
+                  </div>
+                  <input value={active.rezdyRef||""} onChange={e=>mutate(it=>({...it,rezdyRef:e.target.value}))} placeholder="Rezdy ref..." style={{...fi,width:100}} title="Rezdy booking reference"/>
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Arrival</span>
+                    <input type="date" value={active.arrivalDate||""} onChange={e=>mutate(it=>({...it,arrivalDate:e.target.value}))} style={fi}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Departure</span>
+                    <input type="date" value={active.departureDate||""} onChange={e=>mutate(it=>({...it,departureDate:e.target.value}))} style={fi}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total price</span>
+                    <input value={active.totalPrice||""} onChange={e=>mutate(it=>({...it,totalPrice:e.target.value}))} placeholder="e.g. From $3,975 per couple" style={{...fi,width:220}}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Quote valid until</span>
+                    <input type="date" value={active.expiryDate||""} onChange={e=>mutate(it=>({...it,expiryDate:e.target.value}))} style={{...fi}}/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Follow up</span>
+                    <input type="date" value={active.followUpDate||""} onChange={e=>mutate(it=>({...it,followUpDate:e.target.value}))} style={{...fi,borderColor:active.followUpDate&&new Date(active.followUpDate)<=new Date()?C.terra:C.grey200}}/>
+                  </div>
+                  {active.tradeMode&&(
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Book by</span>
+                      <input type="date" value={active.bookByDate||""} onChange={e=>mutate(it=>({...it,bookByDate:e.target.value}))} style={{...fi,borderColor:C.terra}}/>
+                    </div>
+                  )}
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show inclusions</span>
+                    <div onClick={()=>mutate(it=>({...it,showInclusions:it.showInclusions===false?true:false}))} style={{width:32,height:17,borderRadius:9,background:active.showInclusions===false?C.grey200:C.teal,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                      <div style={{position:"absolute",top:2,left:active.showInclusions===false?2:14,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show item pricing</span>
+                    <div onClick={()=>mutate(it=>({...it,showPricing:!it.showPricing}))} style={{width:32,height:17,borderRadius:9,background:active.showPricing?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                      <div style={{position:"absolute",top:2,left:active.showPricing?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                    </div>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginLeft:8}}>Trade mode</span>
+                    <div onClick={()=>mutate(it=>({...it,tradeMode:!it.tradeMode,showPricing:!it.tradeMode}))} style={{width:32,height:17,borderRadius:9,background:active.tradeMode?C.terra:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                      <div style={{position:"absolute",top:2,left:active.tradeMode?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                    </div>
+                    {active.tradeMode&&(
+                      <select value={active.commission||20} onChange={e=>mutate(it=>({...it,commission:parseInt(e.target.value)}))} style={{fontFamily:F.body,fontSize:11,color:C.terra,fontWeight:700,border:`1px solid ${C.terra}40`,borderRadius:5,padding:"3px 6px",outline:"none",background:C.white}}>
+                        {[10,15,20,25].map(c=><option key={c} value={c}>{c}% comm</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Edit sub-tabs */}
+              <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"0 14px",display:"flex",gap:2}}>
+                {EDIT_TABS.map(({k,l})=>(
+                  <button key={k} onClick={()=>setEditTab(k)} style={{fontFamily:F.body,fontSize:12,fontWeight:editTab===k?600:400,color:editTab===k?C.navy:C.grey400,background:"transparent",border:"none",borderBottom:editTab===k?`2px solid ${C.terra}`:"2px solid transparent",padding:"8px 14px",marginBottom:-1}}>
+                    {l}{k==="guest"&&active.guestInfo?.name1?" ✓":""}
+                    {k==="attachments"&&active.attachments?.length>0?` (${active.attachments.length})`:""}
+                  </button>
+                ))}
+              </div>
+
+              {/* Edit content */}
+              <div style={{flex:1,overflowY:"auto",padding:"14px 14px 28px"}}>
+
+                {/* Itinerary tab */}
+                {editTab==="itinerary"&&(
+                  <>
+                    {active.days.map((day,di)=>(
+                      <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
+                        productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
+                        onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem}
+                        onNoteChange={updateNote} onRemove={()=>removeDay(day.id)}
+                        onDuplicate={()=>duplicateDay(day.id)}
+                        onMoveDay={(dir)=>mutate(it=>{const days=[...it.days];const ni=di+dir;if(ni<0||ni>=days.length)return it;[days[di],days[ni]]=[days[ni],days[di]];return{...it,days};})}
+                        isFirstDay={di===0} isLastDay={di===active.days.length-1}
+                      />
+                    ))}
+                    <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,marginTop:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Print layout</div>
+                        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{active.printFlow?"Experiences flow continuously — compact layout":"Each day starts on a new page — more space per day"}</div>
+                      </div>
+                      <div onClick={()=>mutate(it=>({...it,printFlow:!it.printFlow}))} style={{width:36,height:20,borderRadius:10,background:active.printFlow?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                        <div style={{position:"absolute",top:3,left:active.printFlow?16:3,width:14,height:14,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",marginTop:4}}>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Before You Arrive</span>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Terms & Conditions</span>
+                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
+                    </div>
+                  </>
+                )}
+
+                {/* Guest info tab */}
+                {editTab==="guest"&&(
+                  <SectionBox title="Guest Information (internal only)">
+                    <GuestInfoForm guestInfo={active.guestInfo} onChange={gi=>mutate(it=>({...it,guestInfo:gi}))}/>
+                  </SectionBox>
+                )}
+
+                {/* Content tab */}
+                {editTab==="content"&&(
+                  <>
+                    {active.tradeMode&&(
+                      <SectionBox title="Trade Partner Details" accent={C.terra}>
+                        <div style={{display:"flex",gap:8,marginBottom:10}}>
+                          <div style={{flex:2}}>
+                            <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agency / partner name</label>
+                            <input value={active.agentName||""} onChange={e=>mutate(it=>({...it,agentName:e.target.value}))} placeholder="e.g. Nyhavn Rejser" style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none"}}/>
+                          </div>
+                          <div style={{flex:1}}>
+                            <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agent ref / file no.</label>
+                            <input value={active.agentRef||""} onChange={e=>mutate(it=>({...it,agentRef:e.target.value}))} placeholder="e.g. NYH-2027-042" style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none"}}/>
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agent logo (appears on trade cover)</label>
+                          {active.agentLogo?(
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                              <img src={active.agentLogo} alt="Agent logo" style={{height:40,maxWidth:160,objectFit:"contain",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:4,padding:4}}/>
+                              <button onClick={()=>mutate(it=>({...it,agentLogo:""}))} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}30`,borderRadius:4,padding:"3px 10px"}}>Remove</button>
+                            </div>
+                          ):(
+                            <AgentLogoUploader onUpload={url=>mutate(it=>({...it,agentLogo:url}))}/>
+                          )}
+                        </div>
+                      </SectionBox>
+                    )}
+                    <SectionBox title="Cover Hero Image (optional)">
+                      <div style={{marginBottom:8}}>
+                        {active.coverImage?(
+                          <div style={{position:"relative",marginBottom:8}}>
+                            <img src={active.coverImage} alt="Cover" style={{width:"100%",height:100,objectFit:"cover",borderRadius:6,display:"block"}} crossOrigin="anonymous"/>
+                            <button onClick={()=>mutate(it=>({...it,coverImage:""}))} style={{position:"absolute",top:4,right:4,background:C.terra,color:C.white,border:"none",borderRadius:4,padding:"2px 8px",fontFamily:F.body,fontSize:10,cursor:"pointer"}}>Remove</button>
+                          </div>
+                        ):(
+                          <CoverImageUploader onUpload={url=>mutate(it=>({...it,coverImage:url}))}/>
+                        )}
+                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>Appears as a full-bleed background behind the navy cover. Use a landscape landscape photo — vineyard, coastline, wildlife.</div>
+                      </div>
+                    </SectionBox>
+                    <SectionBox title="Welcome Message (appears on cover)">
+                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>A personal note on the cover page, below the client name. Set in italic serif. Leave blank to hide.</div>
+                      <textarea value={active.welcomeMessage||""} onChange={e=>mutate(it=>({...it,welcomeMessage:e.target.value}))} placeholder={`We're delighted to have put together this journey for you — a few days of wine, wilderness and warm Limestone Coast hospitality.\n\nWe look forward to welcoming you in person.`} style={{width:"100%",fontFamily:F.serif,fontStyle:"italic",fontSize:13,color:C.navy,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Introduction / Journey Overview">
+                      <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for the itinerary — what makes this journey special, the tone you want to set. Appears between the cover and Day 1." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:90,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Host Introduction (Simon & Kerry)">
+                      <textarea value={active.hostBio||""} onChange={e=>mutate(it=>({...it,hostBio:e.target.value}))} placeholder="A short introduction to Simon and Kerry as hosts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Before You Arrive">
+                      <textarea value={active.beforeYouArrive||""} onChange={e=>mutate(it=>({...it,beforeYouArrive:e.target.value}))} placeholder="Practical information for guests — getting here, what to pack, mobile coverage, dining notes, emergency contacts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:160,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Terms & Conditions">
+                      <textarea value={active.terms||""} onChange={e=>mutate(it=>({...it,terms:e.target.value}))} placeholder="Terms and conditions. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Email Introduction">
+                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>Opening paragraph for the Gmail draft email — personal note before the itinerary summary. Leave blank for the default.</div>
+                      <textarea value={active.emailIntro||""} onChange={e=>mutate(it=>({...it,emailIntro:e.target.value}))} placeholder={`Hi ${active.clientName||"[name]"},\n\nThank you for your interest in a private journey with us. I've put together the following itinerary based on what we discussed...`} style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="Internal Notes (never shown to client or agent)">
+                      <textarea value={active.internalNotes||""} onChange={e=>mutate(it=>({...it,internalNotes:e.target.value}))} placeholder="Operational reminders, supplier contacts, logistics, follow-up notes..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.terra,border:`1px solid ${C.terra}30`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none",background:"#fff8f6"}}/>
+                    </SectionBox>
+                    <SectionBox title="Footer Note (optional)">
+                      <textarea value={active.notes||""} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Any additional note to appear in the itinerary footer..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:48,outline:"none"}}/>
+                    </SectionBox>
+                  </>
+                )}
+
+                {/* Attachments tab */}
+                {editTab==="attachments"&&(
+                  <SectionBox title="Document Attachments">
+                    <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,marginBottom:12,lineHeight:1.5}}>
+                      Attach PDFs to this itinerary — rate sheets, partner information packs, the See South Australia Collective dossier, wine region maps. Attachments are listed in the itinerary footer and stored in the browser.
+                    </div>
+                    <AttachmentManager attachments={active.attachments} onUpdate={atts=>mutate(it=>({...it,attachments:atts}))}/>
+                  </SectionBox>
+                )}
+
+              </div>
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
