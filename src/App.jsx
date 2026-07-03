@@ -555,6 +555,8 @@ input,textarea,select,button{font-family:inherit;}
   .print-page-num::after{content:counter(page);}
   body{counter-reset:page;}
   .print-break{counter-increment:page;}
+  .cover-body{padding:20px 28px!important;}
+  .cover-welcome{font-size:12px!important;line-height:1.5!important;margin-bottom:10px!important;}
   .intro-block{padding:10px 14px!important;margin-bottom:8px!important;}
   .intro-block div:last-child{font-size:12px!important;line-height:1.55!important;}
   .glance-block{padding:10px 14px!important;margin-bottom:10px!important;break-inside:avoid!important;page-break-inside:avoid!important;}
@@ -1330,30 +1332,30 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
             </div>
           )}
           {/* Cream body */}
-          <div style={{background:C.sandLight,padding:"32px 36px"}}>
+          <div className="cover-body" style={{background:C.sandLight,padding:"32px 36px"}}>
             {/* Title */}
-            <div style={{fontFamily:F.heading,fontSize:38,fontWeight:700,color:C.navy,lineHeight:1.05,marginBottom:10}}>{itinerary.title||"Private Itinerary"}</div>
-            {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:16,fontStyle:"italic",color:C.teal,marginBottom:8}}>Prepared for {itinerary.clientName}</div>}
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:itinerary.welcomeMessage?12:20}}>
+            <div style={{fontFamily:F.heading,fontSize:38,fontWeight:700,color:C.navy,lineHeight:1.05,marginBottom:8}}>{itinerary.title||"Private Itinerary"}</div>
+            {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:15,fontStyle:"italic",color:C.teal,marginBottom:6}}>Prepared for {itinerary.clientName}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:itinerary.welcomeMessage?8:14}}>
               <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:SC[itinerary.status||"draft"],background:`${SC[itinerary.status||"draft"]}18`,border:`1px solid ${SC[itinerary.status||"draft"]}40`,borderRadius:10,padding:"2px 10px",textTransform:"uppercase",letterSpacing:"0.08em"}}>{SL[itinerary.status||"draft"]}</span>
               {itinerary.version&&<span style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>Version {itinerary.version}</span>}
             </div>
-            {itinerary.welcomeMessage&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.navy,lineHeight:1.7,maxWidth:520,marginBottom:20,whiteSpace:"pre-wrap"}}>{itinerary.welcomeMessage}</div>}
+            {itinerary.welcomeMessage&&<div className="cover-welcome" style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.navy,lineHeight:1.6,marginBottom:14,whiteSpace:"pre-wrap"}}>{itinerary.welcomeMessage}</div>}
             {/* Sand rule */}
-            <div style={{height:2,background:C.sand,marginTop:(!itinerary.clientName&&!itinerary.welcomeMessage)?16:0,marginBottom:16}}/>
+            <div style={{height:2,background:C.sand,marginTop:(!itinerary.clientName&&!itinerary.welcomeMessage)?12:0,marginBottom:12}}/>
             {/* Key details row */}
-            <div style={{display:"flex",gap:18,flexWrap:"wrap",marginBottom:14}}>
-              {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
-              {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
-              {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
-              <div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Duration</span> · {fmtDuration(itinerary.days)}</div>
-              {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
+            <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:10}}>
+              {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
+              {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
+              {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
+              <div style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Duration</span> · {fmtDuration(itinerary.days)}</div>
+              {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
             </div>
             {/* Total price */}
             {itinerary.totalPrice&&(
-              <div style={{display:"inline-block",background:C.navy,borderRadius:8,padding:"8px 18px",marginBottom:16}}>
+              <div style={{display:"inline-block",background:C.navy,borderRadius:8,padding:"6px 16px",marginBottom:10}}>
                 <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Total investment</div>
-                <div style={{fontFamily:F.heading,fontSize:22,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
+                <div style={{fontFamily:F.heading,fontSize:20,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
                 {currency&&currency!=="AUD"&&(()=>{
                   const num=parseFloat((itinerary.totalPrice||"").replace(/[^0-9.]/g,""));
                   if(!num||!fxRates)return null;
@@ -1366,7 +1368,7 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
             )}
             {/* Highlights strip */}
             {highlights.length>0&&(
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                 {highlights.map((h,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"4px 10px"}}>
                     <span style={{fontSize:13}}>{h.icon}</span>
