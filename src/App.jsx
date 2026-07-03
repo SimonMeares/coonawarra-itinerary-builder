@@ -1195,7 +1195,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         </div>
       ):(
         /* ── GUEST COVER — brand design: navy header + cream body ── */
-        <div className="cover-page no-print-border" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
+        <div className="no-print-border" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
           {/* Navy header strip with logo */}
           <div style={{background:C.navy,padding:"22px 32px"}}>
             <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:72,width:"auto",display:"block"}} crossOrigin="anonymous"/>
@@ -1203,7 +1203,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
           {/* Hero image — full width, directly below logo banner */}
           {itinerary.coverImage&&(
             <div style={{lineHeight:0,breakInside:"avoid",pageBreakInside:"avoid"}}>
-              <img src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
+              <img src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"21/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
             </div>
           )}
           {/* Cream body */}
