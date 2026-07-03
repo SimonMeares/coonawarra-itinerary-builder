@@ -155,7 +155,7 @@ function buildSamples(){
     createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
   },
   {
-    id:"sample_warrawindi_2n",ceRef:"SAMPLE-001",rezdyRef:"",
+    id:"sample_warrawindi_2n_v2",ceRef:"SAMPLE-001",rezdyRef:"",
     title:"Two-Night Limestone Coast Experience",
     clientName:"",clientEmail:"",guestCount:2,
     arrivalDate:"",departureDate:"",origin:"",
@@ -173,31 +173,26 @@ function buildSamples(){
     showInclusions:true,followUpDate:"",statusHistory:[],
     days:[
       {
-        id:"s_w2n_d1",title:"Check In to Your Luxury Retreat",date:"",location:"Warrawindi Escapes, Penola",
+        id:"s_w2n_v2_d1",title:"Check In to Your Luxury Retreat at Warrawindi Escapes",date:"",location:"Warrawindi Escapes, Penola",
         dayNotes:"Your Limestone Coast journey begins the moment you turn into Warrawindi. A bottle of premium Coonawarra wine and artisan chocolate will be waiting at The Brolga — pour a glass, step out onto the deck and let the quiet of the property settle around you. This is a 3,000-acre working farm, and the stillness here is something most travellers do not expect. This evening, as the light softens over the paddocks, your hosts at Warrawindi will lead you out onto the property for one of the most memorable evenings the Limestone Coast has to offer.",
-        internalNotes:"",
+        internalNotes:"",isFarewell:false,farewellImage:"",
         items:[
-          {id:"s_w2n_d1_i1",productId:"p-brolga",notes:"Welcome wine and artisan chocolate on arrival. A freshly prepared roast dinner will be delivered to your retreat this evening.",overrides:{}},
-          {id:"s_w2n_d1_i2",productId:"p-warrawindi-sunset",notes:"5:00 PM — Farm tour, open fire dinner and stargazing on the Warrawindi property",overrides:{}},
+          {id:"s_w2n_v2_d1_i1",productId:"p-brolga",notes:"Check in from 3:00 PM. Welcome wine and artisan chocolate on arrival. A freshly prepared roast dinner will be delivered to your retreat this evening.",overrides:{}},
+          {id:"s_w2n_v2_d1_i2",productId:"p-warrawindi-sunset",notes:"5:00 PM — Farm tour, open fire dinner and stargazing on the Warrawindi property",overrides:{}},
         ]
       },
       {
-        id:"s_w2n_d2",title:"Your Privately Hosted Limestone Coast Day",date:"",location:"Naracoorte · Coonawarra · Penola",
+        id:"s_w2n_v2_d2",title:"Your Privately Hosted Limestone Coast Day",date:"",location:"Naracoorte · Coonawarra · Penola",
         dayNotes:"Simon is at The Brolga at 9:00 AM. From here, the day takes you underground into prehistory, through the winemaking heart of the Limestone Coast and into places not found on any public map. Allow the day to unfold at its own pace — there is no need to rush anything. You will be back at Warrawindi by around 5:15 PM.",
-        internalNotes:"",
+        internalNotes:"",isFarewell:false,farewellImage:"",
         items:[
-          {id:"s_w2n_d2_i1",productId:"p-naracoorte-caves",notes:"10:15 AM – 11:30 AM · Pick-up from The Brolga at 9:00 AM — approximately 45 minutes to Naracoorte",overrides:{}},
-          {id:"s_w2n_d2_i2",productId:"p-ottelia",notes:"12:30 PM · Seasonal set-menu lunch featuring the finest produce of the Limestone Coast",overrides:{}},
-          {id:"s_w2n_d2_i3",productId:"p-railway-siding",notes:"2:00 PM · A brief stop at the symbolic heart of Coonawarra wine country",overrides:{}},
-          {id:"s_w2n_d2_i4",productId:"p-wynns",notes:"2:15 PM · Icon tasting and private cellar tour inside the historic 1896 Gables winery",overrides:{}},
-          {id:"s_w2n_d2_i5",productId:"p-confido",notes:"3:30 PM · Hosted by the producers in their working olive grove",overrides:{}},
-          {id:"s_w2n_d2_i6",productId:"p-kangaroo-sanctuary",notes:"4:30 PM · Return to The Brolga approximately 5:15 PM",overrides:{}},
+          {id:"s_w2n_v2_d2_i1",productId:"p-caves-cabernet",notes:"Pick-up from The Brolga at 9:00 AM · Return approximately 5:15 PM",overrides:{}},
         ]
       },
       {
-        id:"s_w2n_d3",title:"Farewell from the Limestone Coast",date:"",location:"Warrawindi Escapes, Penola",
+        id:"s_w2n_v2_d3",title:"Farewell from the Limestone Coast",date:"",location:"Warrawindi Escapes, Penola",
         dayNotes:"Take your time this morning. Enjoy a relaxed breakfast with the provisions in your retreat, and if the mood takes you, a last wander around the property before you pack up. The farm is worth one more quiet look.\n\nThank you for choosing to spend time with us on the Limestone Coast. It has been a genuine pleasure having you here, and we hope the past few days have given you a real feel for why this region holds such a special place in our hearts.\n\nSafe travels on your onward journey — wherever the road takes you next. We hope it will not be long before the Limestone Coast calls you back.\n\nWith warm wishes,\nSimon and Kerry Meares\nCoonawarra Experiences",
-        internalNotes:"",items:[]
+        internalNotes:"",isFarewell:true,farewellImage:"",items:[]
       },
     ],
     createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
