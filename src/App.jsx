@@ -471,6 +471,8 @@ function loadPC(){try{const r=localStorage.getItem("ce_product_costs_v1");return
 function savePC(v){try{localStorage.setItem("ce_product_costs_v1",JSON.stringify(v));}catch(e){}}
 function loadImgs(){try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveImgs(i){try{localStorage.setItem("ce_product_images_v2",JSON.stringify(i));}catch(e){alert("Failed to save image references.");}}
+function loadLogos(){try{const r=localStorage.getItem("ce_partner_logos_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
+function saveLogos(l){try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(l));}catch(e){}}
 function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
 function saveIts(l){try{localStorage.setItem("ce_itineraries_v10",JSON.stringify(l));}catch(e){}}
 function loadTemplates(){try{const r=localStorage.getItem("ce_templates_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
@@ -586,6 +588,25 @@ function FarewellImageUploader({onUpload}){
       </div>
       <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
       {error&&<div style={{color:C.terra,fontSize:10,marginTop:3}}>{error}</div>}
+    </div>
+  );
+}
+
+// ─── Partner logo uploader ────────────────────────────────────────────────────
+function PartnerLogoUploader({onUpload}){
+  const inputRef=useRef();
+  const[uploading,setUploading]=useState(false);
+  async function handleFile(file){
+    if(!file||!file.type.startsWith("image/"))return;
+    setUploading(true);
+    try{const url=await uploadToCloudinary(file);onUpload(url);}
+    catch(e){alert("Upload failed — try again.");}
+    finally{setUploading(false);}
+  }
+  return(
+    <div className="pdf-drop" onClick={()=>!uploading&&inputRef.current.click()} style={{textAlign:"center",padding:"8px",borderRadius:6,cursor:"pointer"}}>
+      <div style={{fontFamily:F.body,fontSize:11,color:uploading?C.teal:C.grey400}}>{uploading?<>⏳ Uploading...</>:<>🏢 Click to upload partner logo</>}</div>
+      <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
     </div>
   );
 }
@@ -965,7 +986,7 @@ function BulkImageUploader({allProducts,productImages,onImagesChange}){
 }
 
 // ─── Library card ─────────────────────────────────────────────────────────────
-function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,onDelete,onDuplicate}){
+function LibraryCard({product:p,images,onImagesChange,partnerLogo,onLogoChange,onAdd,showInternal,onEdit,onDelete,onDuplicate}){
   const[open,setOpen]=useState(false);
   const[imgOpen,setImgOpen]=useState(false);
   const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
@@ -1016,6 +1037,17 @@ function LibraryCard({product:p,images,onImagesChange,onAdd,showInternal,onEdit,
               </div>
               {imgOpen&&<ImageUploader productId={p.id} images={images} onImagesChange={onImagesChange}/>}
               {!imgOpen&&(images?.length>0?<div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{images.length} image{images.length!==1?"s":""} on Cloudinary</div>:<div style={{fontFamily:F.body,fontSize:10,color:C.grey200}}>No images yet</div>)}
+            </div>
+            <div style={{borderTop:`1px solid ${C.grey100}`,paddingTop:8,marginTop:8}}>
+              <div style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>Partner Logo</div>
+              {partnerLogo?(
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <img src={partnerLogo} alt="Partner logo" style={{height:36,maxWidth:120,objectFit:"contain",display:"block",background:C.grey100,padding:4,borderRadius:4}} crossOrigin="anonymous"/>
+                  <button onClick={()=>onLogoChange(p.id,"")} style={{fontFamily:F.body,fontSize:10,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:4,padding:"2px 8px",cursor:"pointer"}}>Remove</button>
+                </div>
+              ):(
+                <PartnerLogoUploader onUpload={url=>onLogoChange(p.id,url)}/>
+              )}
             </div>
           </>
         )}
@@ -1169,7 +1201,7 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
 }
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
-function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRates}){
+function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,currency,fxRates}){
   const isTrade=itinerary.tradeMode||false;
   const comm=itinerary.commission||20;
   const highlights=buildHighlights(itinerary,allProducts);
@@ -1352,10 +1384,13 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                   {imgs.length>0&&<ImageStrip images={imgs}/>}
                   <div style={{padding:"12px 14px"}}>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
-                      <div>
+                      <div style={{flex:1}}>
                         <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy}}>{ovName}</div>
                         {p.location&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:1}}>{p.location}</div>}
                       </div>
+                      {partnerLogos&&partnerLogos[p.id]&&(
+                        <img src={partnerLogos[p.id]} alt="" style={{height:34,maxWidth:100,objectFit:"contain",objectPosition:"right top",flexShrink:0,alignSelf:"flex-start"}} crossOrigin="anonymous"/>
+                      )}
                       {showPrice&&(
                         <div style={{textAlign:"right",flexShrink:0}}>
                           {isTrade?(()=>{
@@ -2019,6 +2054,7 @@ export default function App(){
   const[itineraries,setIts]=useState(()=>{const stored=loadIts();const toAdd=buildSamples().filter(s=>!stored.some(it=>it.id===s.id));if(toAdd.length===0)return stored;const merged=[...toAdd,...stored];saveIts(merged);return merged;});
   const[activeId,setActiveId]=useState(null);
   const[productImages,setPImgs]=useState(()=>loadImgs());
+  const[partnerLogos,setPLogos]=useState(()=>loadLogos());
   const[customProducts,setCPs]=useState(()=>loadCP());
   const[productCosts,setPCosts]=useState(()=>loadPC());
   const[templates,setTemplates]=useState(()=>loadTemplates());
@@ -2055,6 +2091,7 @@ export default function App(){
   const active=itineraries.find(i=>i.id===activeId)||null;
 
   function handleImagesChange(productId,imgs){const next={...productImages,[productId]:imgs};setPImgs(next);saveImgs(next);}
+  function handleLogoChange(productId,url){const next={...partnerLogos,[productId]:url||undefined};if(!url)delete next[productId];setPLogos({...next});saveLogos({...next});}
 
   function handleSaveProduct(product){
     let next;
@@ -2396,7 +2433,7 @@ export default function App(){
           </div>
         ):bView==="preview"?(
           <div className="preview-wrapper" style={{padding:"20px 18px"}}>
-            <Preview itinerary={active} productImages={productImages} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
+            <Preview itinerary={active} productImages={productImages} partnerLogos={partnerLogos} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
           </div>
         ):(
           <div className="no-print" style={{display:"flex",height:"calc(100vh - 84px)",overflow:"hidden"}}>
@@ -2423,7 +2460,7 @@ export default function App(){
                 {showForm&&<ProductForm initial={editProduct} onSave={handleSaveProduct} onCancel={()=>{setShowForm(false);setEditProduct(null);}}/>}
                 {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
                 {filtered.map(p=>(
-                  <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} showInternal={showInternal}
+                  <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} partnerLogo={partnerLogos[p.id]||""} onLogoChange={handleLogoChange} showInternal={showInternal}
                     onAdd={product=>{
                       if(!active?.days?.length)return;
                       if(active.days.length===1){addItem(active.days[0].id,product);}
