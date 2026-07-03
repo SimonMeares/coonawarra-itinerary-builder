@@ -434,6 +434,20 @@ const PDF_PRESETS=[
   {id:"mobile",label:"Mobile sharing",desc:"Sharp text · photos ~60% smaller · WhatsApp / Messenger",quality:0.50},
 ];
 function loadScript(src){return new Promise((resolve,reject)=>{if(document.querySelector(`script[src="${src}"]`)){resolve();return;}const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});}
+function paethPredictor(a,b,c){const p=a+b-c,pa=Math.abs(p-a),pb=Math.abs(p-b),pc=Math.abs(p-c);return(pa<=pb&&pa<=pc)?a:pb<=pc?b:c;}
+function reversePngPredictor(data,width,height,ch){
+  const stride=width*ch,out=new Uint8Array(height*stride);
+  for(let y=0;y<height;y++){
+    const rs=y*(stride+1),ft=data[rs];
+    const prev=y>0?out.subarray((y-1)*stride,y*stride):new Uint8Array(stride);
+    const row=out.subarray(y*stride,(y+1)*stride);
+    for(let x=0;x<stride;x++){
+      const v=data[rs+1+x],a=x>=ch?row[x-ch]:0,b=prev[x],c=x>=ch?prev[x-ch]:0;
+      switch(ft){case 0:row[x]=v;break;case 1:row[x]=(v+a)&255;break;case 2:row[x]=(v+b)&255;break;case 3:row[x]=(v+Math.floor((a+b)/2))&255;break;case 4:row[x]=(v+paethPredictor(a,b,c))&255;break;default:row[x]=v;}
+    }
+  }
+  return out;
+}
 
 // ─── Exchange rates ───────────────────────────────────────────────────────────
 const DEFAULT_FX = {NZD:1.08,GBP:0.51,USD:0.64,SGD:0.87,EUR:0.59};
@@ -2316,16 +2330,17 @@ export default function App(){
 
   async function runPdfCompress(){
     if(!pdfCompressFile||pdfCompressing)return;
-    setPdfCompressing(true);setPdfCompressDone(false);setPdfCompressProgress("Loading library...");
+    setPdfCompressing(true);setPdfCompressDone(false);setPdfCompressProgress("Loading libraries...");
     try{
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js");
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js");
       const{PDFDocument,PDFName}=window.PDFLib;
+      const pako=window.pako;
       const preset=PDF_PRESETS.find(p=>p.id===pdfCompressPreset)||PDF_PRESETS[1];
       setPdfCompressProgress("Reading PDF...");
       const arrayBuffer=await pdfCompressFile.arrayBuffer();
       const pdfDoc=await PDFDocument.load(arrayBuffer,{ignoreEncryption:true,updateMetadata:false});
 
-      // Find all image XObjects in the PDF
       const allObjects=[...pdfDoc.context.enumerateIndirectObjects()];
       const imageObjects=allObjects.filter(([,obj])=>{
         if(!obj||typeof obj!=="object"||!obj.dict?.get)return false;
@@ -2334,48 +2349,82 @@ export default function App(){
       });
 
       if(imageObjects.length===0){
-        setPdfCompressProgress("No embedded images found — the PDF may already be optimised.");
-        setTimeout(()=>setPdfCompressProgress(""),4000);
-        setPdfCompressing(false);return;
+        setPdfCompressProgress("No embedded images found — PDF may already be optimised.");
+        setTimeout(()=>{setPdfCompressProgress("");setPdfCompressing(false);},3000);
+        return;
       }
 
-      let processed=0;
+      let processed=0,skipped=0;
       for(const[,obj] of imageObjects){
         const filter=obj.dict.get(PDFName.of("Filter"));
         const filterStr=filter?.toString()||"";
         const isJpeg=filterStr.includes("DCTDecode");
-        if(!isJpeg)continue; // skip non-JPEG streams (vector content etc.)
+        const isFlate=filterStr.includes("FlateDecode");
+        if(!isJpeg&&!isFlate){skipped++;continue;}
+
+        const w=obj.dict.get(PDFName.of("Width"))?.value?.();
+        const h=obj.dict.get(PDFName.of("Height"))?.value?.();
+        if(!w||!h||w*h<2500){skipped++;continue;} // skip tiny images (<50×50)
 
         processed++;
-        setPdfCompressProgress(`Recompressing photo ${processed} of ${imageObjects.length}...`);
+        setPdfCompressProgress(`Compressing image ${processed} of ${imageObjects.length-skipped}...`);
 
-        const jpegBytes=obj.contents;
-        if(!jpegBytes?.length)continue;
-
-        const blob=new Blob([jpegBytes],{type:"image/jpeg"});
-        const url=URL.createObjectURL(blob);
         try{
-          const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
-          const canvas=document.createElement("canvas");
-          canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
-          canvas.getContext("2d").drawImage(img,0,0);
+          let canvas,ctx;
+          canvas=document.createElement("canvas");
+          canvas.width=w;canvas.height=h;
+          ctx=canvas.getContext("2d");
+
+          if(isJpeg){
+            // JPEG: decode via Image element
+            const url=URL.createObjectURL(new Blob([obj.contents],{type:"image/jpeg"}));
+            try{
+              const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+              ctx.drawImage(img,0,0);
+            }finally{URL.revokeObjectURL(url);}
+          } else {
+            // FlateDecode: decompress with pako, reverse PNG predictor, draw pixel data
+            const cs=obj.dict.get(PDFName.of("ColorSpace"))?.toString()||"/DeviceRGB";
+            if(!cs.includes("DeviceRGB")&&!cs.includes("DeviceGray")){skipped++;continue;}
+            const ch=cs.includes("DeviceGray")?1:3;
+            const dp=obj.dict.get(PDFName.of("DecodeParms"));
+            const predictor=dp?.get?.(PDFName.of("Predictor"))?.value?.()||1;
+            let raw;
+            try{raw=pako.inflate(obj.contents);}catch(e){skipped++;continue;}
+            const pixels=predictor>=10?reversePngPredictor(raw,w,h,ch):raw;
+            const imgData=ctx.createImageData(w,h);
+            for(let i=0;i<w*h;i++){
+              if(ch===3){imgData.data[i*4]=pixels[i*3];imgData.data[i*4+1]=pixels[i*3+1];imgData.data[i*4+2]=pixels[i*3+2];}
+              else{const v=pixels[i];imgData.data[i*4]=imgData.data[i*4+1]=imgData.data[i*4+2]=v;}
+              imgData.data[i*4+3]=255;
+            }
+            ctx.putImageData(imgData,0,0);
+          }
+
           const newBlob=await new Promise(res=>canvas.toBlob(res,"image/jpeg",preset.quality));
           const newBytes=new Uint8Array(await newBlob.arrayBuffer());
-          if(newBytes.length<jpegBytes.length){
+
+          // Only replace if actually smaller
+          if(newBytes.length<obj.contents.length){
             obj.contents=newBytes;
+            obj.dict.set(PDFName.of("Filter"),PDFName.of("DCTDecode"));
             obj.dict.set(PDFName.of("Length"),pdfDoc.context.obj(newBytes.length));
+            try{obj.dict.delete(PDFName.of("DecodeParms"));}catch(e){}
           }
-        }finally{URL.revokeObjectURL(url);}
+        }catch(e){skipped++;} // skip any image that errors
       }
 
       setPdfCompressProgress("Saving...");
       const compressedBytes=await pdfDoc.save({useObjectStreams:true});
+      const origMB=(pdfCompressFile.size/1024/1024).toFixed(1);
+      const newMB=(compressedBytes.length/1024/1024).toFixed(1);
       const outBlob=new Blob([compressedBytes],{type:"application/pdf"});
       const outUrl=URL.createObjectURL(outBlob);
       const a=document.createElement("a");a.href=outUrl;
       a.download=`${pdfCompressFile.name.replace(/\.pdf$/i,"")}_${preset.id}.pdf`;
       a.click();URL.revokeObjectURL(outUrl);
-      setPdfCompressDone(true);setPdfCompressProgress("");
+      setPdfCompressDone(true);
+      setPdfCompressProgress(`Done — ${origMB} MB → ${newMB} MB (${Math.round((1-compressedBytes.length/pdfCompressFile.size)*100)}% smaller)`);
     }catch(err){
       setPdfCompressProgress("Error: "+err.message);
       console.error(err);
@@ -2462,7 +2511,7 @@ export default function App(){
 
             {/* Action */}
             {pdfCompressProgress&&<div style={{fontFamily:F.body,fontSize:11,color:C.teal,marginBottom:10,textAlign:"center"}}>{pdfCompressProgress}</div>}
-            {pdfCompressDone&&<div style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.teal,marginBottom:10,textAlign:"center"}}>✓ Compressed PDF downloaded — check your Downloads folder.</div>}
+            {pdfCompressDone&&pdfCompressProgress&&<div style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.teal,marginBottom:10,textAlign:"center"}}>✓ {pdfCompressProgress}</div>}
             <div style={{display:"flex",gap:8}}>
               {!pdfCompressing&&<button onClick={()=>setShowPdfCompressor(false)} style={{fontFamily:F.body,fontSize:12,color:C.grey600,background:C.grey100,border:"none",borderRadius:6,padding:"9px 16px",cursor:"pointer"}}>Close</button>}
               <button onClick={runPdfCompress} disabled={!pdfCompressFile||pdfCompressing} style={{flex:1,fontFamily:F.heading,fontSize:12,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",color:C.white,background:pdfCompressFile&&!pdfCompressing?"#4a6fa5":C.grey400,border:"none",borderRadius:6,padding:"9px 16px",cursor:pdfCompressFile&&!pdfCompressing?"pointer":"default",transition:"background 0.2s"}}>
