@@ -1354,6 +1354,25 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
         </div>
       )}
 
+      {/* Itinerary summary */}
+      {itinerary.days.length>0&&(
+        <div style={{background:C.sandLight,borderRadius:10,padding:"16px 22px",marginBottom:20}}>
+          <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>Your Itinerary at a Glance</div>
+          {itinerary.days.map((day,di)=>{
+            const expNames=day.items.map(item=>{const p=findProduct(allProducts,item.productId);return p?p.name:null;}).filter(Boolean);
+            return(
+              <div key={day.id} style={{display:"flex",gap:12,alignItems:"flex-start",paddingBottom:di<itinerary.days.length-1?12:0,marginBottom:di<itinerary.days.length-1?12:0,borderBottom:di<itinerary.days.length-1?`1px solid ${C.sand}`:""}} >
+                <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase",flexShrink:0,paddingTop:2,minWidth:38}}>DAY {di+1}</div>
+                <div>
+                  <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy,marginBottom:expNames.length?3:0}}>{day.title}</div>
+                  {expNames.length>0&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey600}}>{expNames.join(" · ")}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Days */}
       {itinerary.days.map((day,di)=>{
         const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
