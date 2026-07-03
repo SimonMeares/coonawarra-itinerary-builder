@@ -557,11 +557,13 @@ input,textarea,select,button{font-family:inherit;}
   .print-break{counter-increment:page;}
   .cover-body{padding:20px 28px!important;}
   .cover-welcome{font-size:12px!important;line-height:1.5!important;margin-bottom:10px!important;}
-  .intro-block{padding:10px 14px!important;margin-bottom:8px!important;}
+  .cover-hero-img{height:65mm!important;aspect-ratio:unset!important;width:100%!important;object-fit:cover!important;object-position:center!important;}
+  .intro-block{padding:10px 14px!important;margin-bottom:8px!important;break-after:avoid!important;page-break-after:avoid!important;}
   .intro-block div:last-child{font-size:12px!important;line-height:1.55!important;}
-  .glance-block{padding:10px 14px!important;margin-bottom:10px!important;break-inside:avoid!important;page-break-inside:avoid!important;}
+  .glance-block{padding:10px 14px!important;margin-bottom:10px!important;break-inside:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;page-break-before:avoid!important;}
   .glance-block>div:first-child{margin-bottom:8px!important;}
   .glance-row{padding-bottom:6px!important;margin-bottom:6px!important;}
+  .doc-footer{margin-top:50mm!important;break-inside:avoid!important;page-break-inside:avoid!important;}
 }
 `;
 
@@ -1328,7 +1330,7 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
           {/* Hero image — full width, directly below logo banner */}
           {itinerary.coverImage&&(
             <div style={{lineHeight:0,breakInside:"avoid",pageBreakInside:"avoid"}}>
-              <img src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"21/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
+              <img className="cover-hero-img" src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"21/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
             </div>
           )}
           {/* Cream body */}
@@ -1646,7 +1648,7 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
       <div className="no-print" style={{display:"none"}}/>
       <style>{`@media print{.print-page-num{display:block!important;}.print-break::before{counter-increment:page-num;}.page-num-footer{position:running(footer);}@page{@bottom-center{content:counter(page-num);font-family:Arial,sans-serif;font-size:9pt;color:#9e9b92;}}}`}</style>
       {/* Footer */}
-      <div style={{background:C.navy,borderRadius:10,padding:"18px 24px"}}>
+      <div className="doc-footer" style={{background:C.navy,borderRadius:10,padding:"18px 24px"}}>
         <div style={{fontFamily:F.serif,fontSize:13,fontStyle:"italic",color:C.sand,marginBottom:10}}>"Unearthing South Australia's captivating Limestone Coast."</div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
           {[["Phone","1800 861 190"],["Email","info@coonawarraexperiences.com.au"],["Web","coonawarraexperiences.com.au"]].map(([k,v])=>(
