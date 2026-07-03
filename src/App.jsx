@@ -498,9 +498,9 @@ input,textarea,select,button{font-family:inherit;}
   .cover-page{page-break-after:always;break-after:page;}
   .divider-page{page-break-before:always;page-break-after:always;break-before:page;break-after:page;}
   img{break-inside:avoid;page-break-inside:avoid;}
-  @page{margin:20mm 20mm;size:A4;}
+  @page{margin:20mm 25mm;size:A4;}
   @page :first{margin:0;}
-  .preview-wrapper{padding:0!important;}
+  .preview-wrapper{padding:0 8px!important;}
   .exp-card{overflow:visible!important;break-inside:avoid!important;page-break-inside:avoid!important;}
   .day-hdr{break-after:avoid;page-break-after:avoid;}
   .day-weather-note{break-after:avoid;page-break-after:avoid;}
