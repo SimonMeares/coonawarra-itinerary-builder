@@ -1908,7 +1908,7 @@ export default function App(){
   const[bView,setBView]=useState("edit");
   const[editTab,setEditTab]=useState("itinerary");
   const[showInternal,setSI]=useState(false);
-  const[itineraries,setIts]=useState(()=>{const stored=loadIts();if(stored.length>0)return stored;const samples=buildSamples();saveIts(samples);return samples;});
+  const[itineraries,setIts]=useState(()=>{const stored=loadIts();if(stored.some(it=>it.id==="sample_warrawindi_2n"))return stored;const samples=buildSamples();const merged=[...samples,...stored];saveIts(merged);return merged;});
   const[activeId,setActiveId]=useState(null);
   const[productImages,setPImgs]=useState(()=>loadImgs());
   const[customProducts,setCPs]=useState(()=>loadCP());
