@@ -1200,6 +1200,12 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
           <div style={{background:C.navy,padding:"22px 32px"}}>
             <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:72,width:"auto",display:"block"}} crossOrigin="anonymous"/>
           </div>
+          {/* Hero image — full width, directly below logo banner */}
+          {itinerary.coverImage&&(
+            <div style={{lineHeight:0,breakInside:"avoid",pageBreakInside:"avoid"}}>
+              <img src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
+            </div>
+          )}
           {/* Cream body */}
           <div style={{background:C.sandLight,padding:"32px 36px"}}>
             {/* Title */}
@@ -1258,12 +1264,6 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
           <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>{isTrade?"Product overview":"About this journey"}</div>
           <div style={{fontFamily:F.serif,fontSize:14,color:C.navy,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.intro}</div>
-        </div>
-      )}
-      {/* Hero image — below intro */}
-      {!isTrade&&itinerary.coverImage&&(
-        <div style={{marginBottom:20,borderRadius:10,overflow:"hidden",...IMG_WRAP}}>
-          <img src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
         </div>
       )}
 
