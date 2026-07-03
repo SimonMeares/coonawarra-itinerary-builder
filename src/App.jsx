@@ -164,6 +164,9 @@ function uid(){return "c_"+Math.random().toString(36).slice(2,11);}
 function findProduct(all,id){return all.find(p=>p.id===id);}
 function fmtDate(d){if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});}
 function fmtDateShort(d){if(!d)return"";return new Date(d).toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"});}
+// Duration: 1 day → "1 Day"; 2 entries → "1 Night"; 3+ → "2 Nights · 1 Day" etc.
+function fmtDuration(days){const n=days.length;if(n<=1)return`${n||0} Day`;const nights=n-1;if(n===2)return`${nights} Night`;const td=n-2;return`${nights} Night${nights!==1?"s":""} · ${td} Day${td!==1?"s":""}`;}
+function fmtNights(days){return Math.max(0,days.length-1);}
 
 function formatPrice(pricing){
   const{structure,tiers}=pricing;
@@ -261,7 +264,7 @@ function buildHighlights(itinerary,allProducts){
   const items=itinerary.days.flatMap(d=>d.items);
   const seen=new Set();
   const highlights=[];
-  const nights=itinerary.days.length;
+  const nights=fmtNights(itinerary.days);
   if(nights>0)highlights.push({icon:"🌙",label:`${nights} ${nights===1?"Night":"Nights"}`});
   if(itinerary.guestCount)highlights.push({icon:"👤",label:`${itinerary.guestCount} ${itinerary.guestCount===1?"Guest":"Guests"}`});
   const tagPriority=["Wagyu","Caves","Indigenous","Wildlife","Heritage","Wine","Off-Grid","Cultural","Transfer","Coastal"];
@@ -1099,7 +1102,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
               {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
               {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
               {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
-              <div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {itinerary.days.length} {itinerary.days.length===1?"day":"days"}</div>
+              <div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {fmtDuration(itinerary.days)}</div>
               {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
             </div>
             {/* Commission + Book by boxes */}
@@ -1158,7 +1161,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
                 {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
                 {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
                 {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
-                <div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {itinerary.days.length} {itinerary.days.length===1?"day":"days"}</div>
+                <div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {fmtDuration(itinerary.days)}</div>
                 {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
               </div>
               {/* Total price */}
@@ -1454,7 +1457,7 @@ function generateOfflineHTML(itinerary, allProducts, productImages, activeCurren
       ${itinerary.arrivalDate?`<span><b>Arrival</b> · ${fmtD(itinerary.arrivalDate)}</span>`:""}
       ${itinerary.departureDate?`<span><b>Departure</b> · ${fmtD(itinerary.departureDate)}</span>`:""}
       ${itinerary.guestCount?`<span><b>Guests</b> · ${itinerary.guestCount}</span>`:""}
-      <span><b>Duration</b> · ${itinerary.days.length} day${itinerary.days.length===1?"":"s"}</span>
+      <span><b>Duration</b> · ${fmtDuration(itinerary.days)}</span>
       ${itinerary.origin?`<span><b>Origin</b> · ${itinerary.origin}</span>`:""}
     </div>
     ${itinerary.totalPrice?`<div class="price-box"><div class="price-label">Total investment</div><div class="price-val">${itinerary.totalPrice}</div></div>`:""}
