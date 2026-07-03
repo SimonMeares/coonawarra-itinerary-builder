@@ -1343,17 +1343,6 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
         </div>
       )}
 
-      {/* Host bio */}
-      {itinerary.hostBio&&(
-        <div style={{background:C.sandLight,borderRadius:10,padding:"16px 22px",marginBottom:20,display:"flex",gap:16,alignItems:"flex-start"}}>
-          <div style={{width:44,height:44,borderRadius:"50%",background:C.navy,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.sand}}>SK</div>
-          <div>
-            <div style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.navy,marginBottom:4,letterSpacing:"0.04em",textTransform:"uppercase"}}>Your hosts · Simon & Kerry Meares</div>
-            <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.65}}>{itinerary.hostBio}</div>
-          </div>
-        </div>
-      )}
-
       {/* Itinerary summary */}
       {itinerary.days.length>0&&(
         <div style={{background:C.sandLight,borderRadius:10,padding:"16px 22px",marginBottom:20}}>
@@ -1530,6 +1519,17 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
           </div>
         );
       })()}
+
+      {/* Host bio — after farewell, before Before You Arrive */}
+      {itinerary.hostBio&&(
+        <div style={{background:C.sandLight,borderRadius:10,padding:"16px 22px",marginBottom:20,display:"flex",gap:16,alignItems:"flex-start"}}>
+          <div style={{width:44,height:44,borderRadius:"50%",background:C.navy,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.sand}}>SK</div>
+          <div>
+            <div style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.navy,marginBottom:4,letterSpacing:"0.04em",textTransform:"uppercase"}}>Your hosts · Simon & Kerry Meares</div>
+            <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.65}}>{itinerary.hostBio}</div>
+          </div>
+        </div>
+      )}
 
       {/* Before You Arrive — banner + content on same page */}
       {itinerary.beforeYouArrive&&!isTrade&&(
