@@ -67,6 +67,19 @@ Kerry Meares (mobile): +61 405 733 477
 Emergency services: 000
 Penola Hospital: +61 8 8737 0000`;
 
+const DEFAULT_HOW_TO_BOOK = `To confirm your booking, a 10% deposit is required. We will send you a booking confirmation once the deposit has been received.
+
+The balance is due 30 days prior to your arrival. Bookings made within 30 days of departure require payment in full at the time of booking.
+
+To proceed, please contact us:
+
+Simon and Kerry Meares
+Phone: 1800 861 190
+Email: info@coonawarraexperiences.com.au
+Website: coonawarraexperiences.com.au
+
+We look forward to welcoming you to the Limestone Coast.`;
+
 const BUILT_IN_PRODUCTS = [
   {id:"p-uncle-ken",rezdy:"UNCLEKEN",category:"Day Tours",name:"On Country with Uncle Ken",subtitle:"Private cultural experience · Port MacDonnell",type:"private",duration:"3.5 hrs + coastal lunch",departures:"On request",location:"Port MacDonnell",partner:"Bush Adventures",minGuests:2,maxGuests:null,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:1295}],note:"On request"},tags:["Indigenous","Cultural","Wildlife","Coastal"],description:"A private cultural experience with Uncle Ken Jones, NAIDOC Elder and proud Boandik man, on his saltwater Country. Stories, songs and a lifetime of knowledge, shared first-hand by a man who has spent more than fifty years as a wildlife officer and conservationist on this coastline. Afterwards, a secluded beach luncheon — deck chairs in the sand, fresh Southern Rock Lobster with crusty bread and a chilled Coonawarra Riesling.",inclusions:["Private guided walk on Boandik Country with Uncle Ken Jones","Stories, songs and cultural knowledge of the land and sea","Coastal luncheon at a secluded beach","Fresh Southern Rock Lobster with crusty bread and lemon","Chilled Coonawarra Riesling","Premium transport, driven by your hosts","Pick-up and drop-off, Penola / Coonawarra region"]},
   {id:"p-caves-cabernet",rezdy:"PGXR9D",category:"Day Tours",name:"Caves, Cabernet & Kangaroos",subtitle:"Full day private tour · Min 2 / Max 4",type:"private",duration:"8 hrs",schedule:"9:00 – 17:00",departures:"Daily",location:"Naracoorte · Coonawarra · Penola",minGuests:2,maxGuests:4,pricing:{structure:"per_adult",tiers:[{label:"Per adult",retail:715}],note:null},tags:["Caves","Wine","Wildlife","Olive Oil"],description:"One of the Limestone Coast's most complete private days — ancient underground worlds, celebrated wine country, an intimate olive grove and a kangaroo sanctuary that most visitors never get to see. The morning begins at the UNESCO World Heritage–listed Naracoorte Caves, where a private guide takes you through the Victoria Fossil Cave and into the story of Australia's long-extinct megafauna. A seasonal set-menu lunch at Ottelia follows before the afternoon moves through the historic Coonawarra Railway Siding and into Wynns Coonawarra Estate, the region's founding winery. The Confido olive grove offers a beautiful contrast — a paddock-to-plate insight into extra-virgin olive oil, hosted by the makers themselves. The day closes at a private kangaroo sanctuary, where you meet the carers and feed orphaned joeys in an intimate, unhurried setting.",inclusions:["Private guided tour, UNESCO World Heritage–listed Naracoorte Caves — Victoria Fossil Cave and megafauna discoveries","Seasonal set-menu lunch at Ottelia, Coonawarra — fresh local produce with matched estate wines","Historic Coonawarra Railway Siding visit with regional storytelling","Private icon wine tasting at Wynns Coonawarra Estate — the region's founding winery, established 1896","Hosted olive oil tasting at Confido, Coonawarra — a working olive grove with paddock-to-plate insight","Exclusive visit to a private kangaroo sanctuary — meet the carers, feed orphaned joeys","Premium transport throughout the day, driven by your hosts","Pick-up and drop-off, Penola / Coonawarra region","All entry and tasting fees included"]},
@@ -351,7 +364,7 @@ function generateCERef(existingItineraries) {
 }
 
 function newDay(index){
-  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:"",internalNotes:"",isFarewell:false,farewellImage:""};
+  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:"",internalNotes:"",isFarewell:false,farewellImage:"",accommodation:""};
 }
 
 function newItinerary(){
@@ -361,7 +374,7 @@ function newItinerary(){
     status:"draft",totalPrice:"",expiryDate:"",bookByDate:"",showPricing:false,tradeMode:false,commission:20,printFlow:false,agentLogo:"",agentName:"",agentRef:"",
     intro:"",hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they've built with the region's people, places and producers.",
     welcomeMessage:"",emailIntro:"",beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
-    terms:DEFAULT_TERMS,notes:"",
+    terms:DEFAULT_TERMS,howToBook:DEFAULT_HOW_TO_BOOK,version:"",notes:"",
     coverImage:"",attachments:[],
     guestInfo:{name1:"",name2:"",email:"",phone:"",country:"",dietary:"",medical:"",celebrating:"",notes:""},
     internalNotes:"",showInclusions:true,followUpDate:"",statusHistory:[],days:[newDay(1)],
@@ -1209,6 +1222,7 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
           />
         ))}
         <textarea value={day.dayNotes} onChange={e=>onUpdate({...day,dayNotes:e.target.value})} placeholder="Day overview notes (appears in itinerary)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:36,outline:"none",marginTop:4}}/>
+        <input value={day.accommodation||""} onChange={e=>onUpdate({...day,accommodation:e.target.value})} placeholder="Staying tonight: e.g. Blue Wren Retreat, Warrawindi Escapes" style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",outline:"none",marginTop:4,boxSizing:"border-box"}}/>
         <textarea value={day.internalNotes||""} onChange={e=>onUpdate({...day,internalNotes:e.target.value})} placeholder="Internal notes — operational reminders, supplier contacts (never shown to client)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.terra,border:`1px solid ${C.terra}30`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:32,outline:"none",marginTop:4,background:"#fff8f6"}}/>
         <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,padding:"6px 10px",background:day.isFarewell?`${C.teal}08`:`${C.grey100}60`,border:`1px solid ${day.isFarewell?C.teal+"40":C.grey200}`,borderRadius:6}}>
           <div style={{flex:1,fontFamily:F.body,fontSize:11,fontWeight:600,color:day.isFarewell?C.teal:C.grey600}}>Farewell day{day.isFarewell?" — image will appear at the bottom of this day":""}</div>
@@ -1319,7 +1333,11 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
           <div style={{background:C.sandLight,padding:"32px 36px"}}>
             {/* Title */}
             <div style={{fontFamily:F.heading,fontSize:38,fontWeight:700,color:C.navy,lineHeight:1.05,marginBottom:10}}>{itinerary.title||"Private Itinerary"}</div>
-            {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:16,fontStyle:"italic",color:C.teal,marginBottom:itinerary.welcomeMessage?12:20}}>Prepared for {itinerary.clientName}</div>}
+            {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:16,fontStyle:"italic",color:C.teal,marginBottom:8}}>Prepared for {itinerary.clientName}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:itinerary.welcomeMessage?12:20}}>
+              <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:SC[itinerary.status||"draft"],background:`${SC[itinerary.status||"draft"]}18`,border:`1px solid ${SC[itinerary.status||"draft"]}40`,borderRadius:10,padding:"2px 10px",textTransform:"uppercase",letterSpacing:"0.08em"}}>{SL[itinerary.status||"draft"]}</span>
+              {itinerary.version&&<span style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>Version {itinerary.version}</span>}
+            </div>
             {itinerary.welcomeMessage&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.navy,lineHeight:1.7,maxWidth:520,marginBottom:20,whiteSpace:"pre-wrap"}}>{itinerary.welcomeMessage}</div>}
             {/* Sand rule */}
             <div style={{height:2,background:C.sand,marginTop:(!itinerary.clientName&&!itinerary.welcomeMessage)?16:0,marginBottom:16}}/>
@@ -1498,6 +1516,12 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
               );
             })}
             {day.items.length===0&&<div style={{textAlign:"center",padding:16,color:C.grey400,fontFamily:F.body,fontSize:12,border:`1px dashed ${C.grey200}`,borderRadius:6}}>No experiences added to this day</div>}
+            {day.accommodation&&(
+              <div style={{marginTop:12,padding:"8px 12px",background:C.sandLight,borderRadius:6,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:13}}>🏨</span>
+                <span style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{fontWeight:700,color:C.navy}}>Staying tonight</span> · {day.accommodation}</span>
+              </div>
+            )}
             {day.isFarewell&&day.farewellImage&&(
               <div style={{marginTop:16,borderRadius:8,overflow:"hidden",breakInside:"avoid",pageBreakInside:"avoid"}}>
                 <img src={day.farewellImage} alt="" style={{width:"100%",aspectRatio:"21/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
@@ -1577,6 +1601,14 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
             <span style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>Before You Arrive</span>
           </div>
           <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.beforeYouArrive}</div>
+        </div>
+      )}
+
+      {/* How to Book — guest view only */}
+      {itinerary.howToBook&&!isTrade&&(
+        <div style={{marginBottom:20,padding:"16px 22px",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,borderLeft:`4px solid ${C.teal}`}}>
+          <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:10}}>How to Book</div>
+          <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.howToBook}</div>
         </div>
       )}
 
@@ -2596,6 +2628,10 @@ export default function App(){
                     <input type="date" value={active.expiryDate||""} onChange={e=>mutate(it=>({...it,expiryDate:e.target.value}))} style={{...fi}}/>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Version</span>
+                    <input value={active.version||""} onChange={e=>mutate(it=>({...it,version:e.target.value}))} placeholder="e.g. 2" style={{...fi,width:60}} title="Version number — shown on cover alongside status badge"/>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Follow up</span>
                     <input type="date" value={active.followUpDate||""} onChange={e=>mutate(it=>({...it,followUpDate:e.target.value}))} style={{...fi,borderColor:active.followUpDate&&new Date(active.followUpDate)<=new Date()?C.terra:C.grey200}}/>
                   </div>
@@ -2732,6 +2768,10 @@ export default function App(){
                     </SectionBox>
                     <SectionBox title="Before You Arrive">
                       <textarea value={active.beforeYouArrive||""} onChange={e=>mutate(it=>({...it,beforeYouArrive:e.target.value}))} placeholder="Practical information for guests — getting here, what to pack, mobile coverage, dining notes, emergency contacts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:160,outline:"none"}}/>
+                    </SectionBox>
+                    <SectionBox title="How to Book (guest view only)">
+                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>Deposit, payment and contact details. Appears before Terms & Conditions in the guest itinerary. Leave blank to hide.</div>
+                      <textarea value={active.howToBook||""} onChange={e=>mutate(it=>({...it,howToBook:e.target.value}))} placeholder="To confirm your booking, a 10% deposit is required..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
                     </SectionBox>
                     <SectionBox title="Terms & Conditions">
                       <textarea value={active.terms||""} onChange={e=>mutate(it=>({...it,terms:e.target.value}))} placeholder="Terms and conditions. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
