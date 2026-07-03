@@ -429,9 +429,9 @@ function printCompressed(title){
 
 // ─── PDF Compression ──────────────────────────────────────────────────────────
 const PDF_PRESETS=[
-  {id:"archive",label:"Archive quality",desc:"Best for printing or archiving · ~25% smaller",scale:2.0,quality:0.90},
-  {id:"email",label:"Email / web",desc:"Ideal for sending to guests · ~50% smaller",scale:1.5,quality:0.75},
-  {id:"mobile",label:"Mobile sharing",desc:"WhatsApp / Messenger · Smallest file",scale:1.0,quality:0.58},
+  {id:"archive",label:"Archive quality",desc:"Best for printing or archiving · ~15% smaller",scale:3.0,quality:0.93},
+  {id:"email",label:"Email / web",desc:"Ideal for sending to guests · ~35% smaller",scale:2.5,quality:0.83},
+  {id:"mobile",label:"Mobile sharing",desc:"WhatsApp / Messenger · ~55% smaller",scale:1.8,quality:0.70},
 ];
 function loadScript(src){return new Promise((resolve,reject)=>{if(document.querySelector(`script[src="${src}"]`)){resolve();return;}const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});}
 
