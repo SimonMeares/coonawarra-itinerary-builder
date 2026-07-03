@@ -514,6 +514,11 @@ input,textarea,select,button{font-family:inherit;}
   .print-page-num::after{content:counter(page);}
   body{counter-reset:page;}
   .print-break{counter-increment:page;}
+  .intro-block{padding:10px 14px!important;margin-bottom:8px!important;}
+  .intro-block div:last-child{font-size:12px!important;line-height:1.55!important;}
+  .glance-block{padding:10px 14px!important;margin-bottom:10px!important;break-inside:avoid!important;page-break-inside:avoid!important;}
+  .glance-block>div:first-child{margin-bottom:8px!important;}
+  .glance-row{padding-bottom:6px!important;margin-bottom:6px!important;}
 }
 `;
 
@@ -1337,7 +1342,7 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
       )}
       {/* Intro */}
       {itinerary.intro&&(
-        <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
+        <div className="intro-block" style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
           <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>{isTrade?"Product overview":"About this journey"}</div>
           <div style={{fontFamily:F.serif,fontSize:14,color:C.navy,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.intro}</div>
         </div>
@@ -1345,12 +1350,12 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
 
       {/* Itinerary summary */}
       {itinerary.days.length>0&&(
-        <div style={{background:C.sandLight,borderRadius:10,padding:"16px 22px",marginBottom:20}}>
+        <div className="glance-block" style={{background:C.sandLight,borderRadius:10,padding:"16px 22px",marginBottom:20}}>
           <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:12}}>Your Itinerary at a Glance</div>
           {itinerary.days.map((day,di)=>{
             const expNames=day.items.map(item=>{const p=findProduct(allProducts,item.productId);return p?p.name:null;}).filter(Boolean);
             return(
-              <div key={day.id} style={{display:"flex",gap:12,alignItems:"flex-start",paddingBottom:di<itinerary.days.length-1?12:0,marginBottom:di<itinerary.days.length-1?12:0,borderBottom:di<itinerary.days.length-1?`1px solid ${C.sand}`:""}} >
+              <div key={day.id} className="glance-row" style={{display:"flex",gap:12,alignItems:"flex-start",paddingBottom:di<itinerary.days.length-1?12:0,marginBottom:di<itinerary.days.length-1?12:0,borderBottom:di<itinerary.days.length-1?`1px solid ${C.sand}`:""}} >
                 <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase",flexShrink:0,paddingTop:2,minWidth:38}}>DAY {di+1}</div>
                 <div>
                   <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy,marginBottom:expNames.length?3:0}}>{day.title}</div>
