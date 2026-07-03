@@ -355,7 +355,7 @@ function generateCERef(existingItineraries) {
 }
 
 function newDay(index){
-  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:"",internalNotes:""};
+  return{id:uid(),title:`Day ${index}`,date:"",location:"",items:[],dayNotes:"",internalNotes:"",isFarewell:false,farewellImage:""};
 }
 
 function newItinerary(){
@@ -564,6 +564,29 @@ function CoverImageUploader({onUpload}){
     <div className="pdf-drop" onClick={()=>!uploading&&inputRef.current.click()} style={{marginBottom:6,textAlign:"center",padding:"14px"}}>
       <div style={{fontFamily:F.body,fontSize:11,color:uploading?C.teal:C.grey400}}>
         {uploading?<>⏳ Uploading...</>:<>🖼 Click to upload cover image</>}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+      {error&&<div style={{color:C.terra,fontSize:10,marginTop:3}}>{error}</div>}
+    </div>
+  );
+}
+
+// ─── Farewell image uploader ──────────────────────────────────────────────────
+function FarewellImageUploader({onUpload}){
+  const inputRef=useRef();
+  const[uploading,setUploading]=useState(false);
+  const[error,setError]=useState(null);
+  async function handleFile(file){
+    if(!file||!file.type.startsWith("image/"))return;
+    setUploading(true);setError(null);
+    try{const url=await uploadToCloudinary(file);onUpload(url);}
+    catch(e){setError("Upload failed — try again.");}
+    finally{setUploading(false);}
+  }
+  return(
+    <div className="pdf-drop" onClick={()=>!uploading&&inputRef.current.click()} style={{textAlign:"center",padding:"10px",borderRadius:6,cursor:"pointer"}}>
+      <div style={{fontFamily:F.body,fontSize:11,color:uploading?C.teal:C.grey400}}>
+        {uploading?<>⏳ Uploading...</>:<>🖼 Click to upload farewell image</>}
       </div>
       <input ref={inputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
       {error&&<div style={{color:C.terra,fontSize:10,marginTop:3}}>{error}</div>}
@@ -1126,6 +1149,24 @@ function DayCard({day,dayIndex,totalDays,productImages,allProducts,showPricing,o
         ))}
         <textarea value={day.dayNotes} onChange={e=>onUpdate({...day,dayNotes:e.target.value})} placeholder="Day overview notes (appears in itinerary)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:36,outline:"none",marginTop:4}}/>
         <textarea value={day.internalNotes||""} onChange={e=>onUpdate({...day,internalNotes:e.target.value})} placeholder="Internal notes — operational reminders, supplier contacts (never shown to client)..." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.terra,border:`1px solid ${C.terra}30`,borderRadius:6,padding:"6px 10px",resize:"vertical",minHeight:32,outline:"none",marginTop:4,background:"#fff8f6"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,padding:"6px 10px",background:day.isFarewell?`${C.teal}08`:`${C.grey100}60`,border:`1px solid ${day.isFarewell?C.teal+"40":C.grey200}`,borderRadius:6}}>
+          <div style={{flex:1,fontFamily:F.body,fontSize:11,fontWeight:600,color:day.isFarewell?C.teal:C.grey600}}>Farewell day{day.isFarewell?" — image will appear at the bottom of this day":""}</div>
+          <div onClick={()=>onUpdate({...day,isFarewell:!day.isFarewell})} style={{width:32,height:18,borderRadius:9,background:day.isFarewell?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+            <div style={{position:"absolute",top:2,left:day.isFarewell?14:2,width:14,height:14,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+          </div>
+        </div>
+        {day.isFarewell&&(
+          <div style={{marginTop:6}}>
+            {day.farewellImage?(
+              <div style={{position:"relative",borderRadius:6,overflow:"hidden"}}>
+                <img src={day.farewellImage} alt="Farewell" style={{width:"100%",height:90,objectFit:"cover",display:"block"}} crossOrigin="anonymous"/>
+                <button onClick={()=>onUpdate({...day,farewellImage:""})} style={{position:"absolute",top:4,right:4,background:C.terra,color:C.white,border:"none",borderRadius:4,padding:"2px 8px",fontFamily:F.body,fontSize:10,cursor:"pointer"}}>Remove</button>
+              </div>
+            ):(
+              <FarewellImageUploader onUpload={url=>onUpdate({...day,farewellImage:url})}/>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1385,6 +1426,11 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
               );
             })}
             {day.items.length===0&&<div style={{textAlign:"center",padding:16,color:C.grey400,fontFamily:F.body,fontSize:12,border:`1px dashed ${C.grey200}`,borderRadius:6}}>No experiences added to this day</div>}
+            {day.isFarewell&&day.farewellImage&&(
+              <div style={{marginTop:16,borderRadius:8,overflow:"hidden",breakInside:"avoid",pageBreakInside:"avoid"}}>
+                <img src={day.farewellImage} alt="" style={{width:"100%",aspectRatio:"21/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
+              </div>
+            )}
           </div>
         );
       })}
@@ -1435,18 +1481,15 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         );
       })()}
 
-      {/* Divider before Before You Arrive */}
-      {itinerary.beforeYouArrive&&!isTrade&&(
-        <div className="divider-page no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
-          <div>
-            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
-            <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white}}>Before You Arrive</div>
-          </div>
-        </div>
-      )}
-      {/* Before you arrive */}
+      {/* Before You Arrive — banner + content on same page */}
       {itinerary.beforeYouArrive&&!isTrade&&(
         <div className="print-break" style={{marginBottom:20}}>
+          <div className="no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
+            <div>
+              <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
+              <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white}}>Before You Arrive</div>
+            </div>
+          </div>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
             <span style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>Before You Arrive</span>
           </div>
@@ -1454,18 +1497,15 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         </div>
       )}
 
-      {/* Divider before Terms */}
-      {itinerary.terms&&(
-        <div className="divider-page no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
-          <div>
-            <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
-            <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white}}>{isTrade?"Booking Conditions":"Terms & Conditions"}</div>
-          </div>
-        </div>
-      )}
-      {/* Terms */}
+      {/* Terms & Conditions — banner + content on same page */}
       {itinerary.terms&&(
         <div className="print-break" style={{marginBottom:20}}>
+          <div className="no-print-border" style={{background:C.navy,borderRadius:10,marginBottom:16,padding:"40px 36px",display:"flex",alignItems:"center",minHeight:120}}>
+            <div>
+              <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8}}>Coonawarra Experiences</div>
+              <div style={{fontFamily:F.heading,fontSize:28,fontWeight:700,color:C.white}}>{isTrade?"Booking Conditions":"Terms & Conditions"}</div>
+            </div>
+          </div>
           <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>{isTrade?"Booking Conditions":"Terms & Conditions"}</div>
           <div style={{fontFamily:F.body,fontSize:11,color:C.grey600,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{itinerary.terms}</div>
         </div>
@@ -2520,6 +2560,15 @@ export default function App(){
                 {/* Itinerary tab */}
                 {editTab==="itinerary"&&(
                   <>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,marginBottom:10}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Print layout</div>
+                        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{active.printFlow?"Days flow continuously — compact layout":"Each day starts on a new page"}</div>
+                      </div>
+                      <div onClick={()=>mutate(it=>({...it,printFlow:!it.printFlow}))} style={{width:36,height:20,borderRadius:10,background:active.printFlow?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                        <div style={{position:"absolute",top:3,left:active.printFlow?16:3,width:14,height:14,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
+                      </div>
+                    </div>
                     {active.days.map((day,di)=>(
                       <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
                         productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
@@ -2535,25 +2584,6 @@ export default function App(){
                       />
                     ))}
                     <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,marginTop:8}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Print layout</div>
-                        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{active.printFlow?"Experiences flow continuously — compact layout":"Each day starts on a new page — more space per day"}</div>
-                      </div>
-                      <div onClick={()=>mutate(it=>({...it,printFlow:!it.printFlow}))} style={{width:36,height:20,borderRadius:10,background:active.printFlow?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                        <div style={{position:"absolute",top:3,left:active.printFlow?16:3,width:14,height:14,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
-                      </div>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",marginTop:4}}>
-                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
-                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Before You Arrive</span>
-                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
-                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
-                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",flexShrink:0}}>Page break · Terms & Conditions</span>
-                      <div style={{flex:1,height:1,background:`repeating-linear-gradient(90deg,${C.grey200} 0,${C.grey200} 6px,transparent 6px,transparent 12px)`}}/>
-                    </div>
                   </>
                 )}
 
