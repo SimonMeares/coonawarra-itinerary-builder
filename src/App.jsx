@@ -2709,7 +2709,8 @@ export default function App(){
                 <button onClick={()=>deleteIt(it.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"5px 10px"}}>Delete</button>
               </div>
             </div>
-          ))}
+          ))
+          })()}
           {/* Product usage tracker */}
           {itineraries.length>0&&(()=>{
             const usage=getProductUsage(itineraries,allProducts).slice(0,8);
@@ -3015,6 +3016,7 @@ export default function App(){
           </div>
         )
       )}
+
     </div>
   );
 }
