@@ -427,6 +427,14 @@ function printCompressed(title){
   });
 }
 
+// ─── PDF Compression ──────────────────────────────────────────────────────────
+const PDF_PRESETS=[
+  {id:"archive",label:"Archive quality",desc:"Best for printing or archiving · ~25% smaller",scale:2.0,quality:0.90},
+  {id:"email",label:"Email / web",desc:"Ideal for sending to guests · ~50% smaller",scale:1.5,quality:0.75},
+  {id:"mobile",label:"Mobile sharing",desc:"WhatsApp / Messenger · Smallest file",scale:1.0,quality:0.58},
+];
+function loadScript(src){return new Promise((resolve,reject)=>{if(document.querySelector(`script[src="${src}"]`)){resolve();return;}const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});}
+
 // ─── Exchange rates ───────────────────────────────────────────────────────────
 const DEFAULT_FX = {NZD:1.08,GBP:0.51,USD:0.64,SGD:0.87,EUR:0.59};
 const FX_KEY = "ce_fx_rates";
@@ -2183,6 +2191,12 @@ export default function App(){
   const[sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const[copyFromId,setCopyFromId]=useState("");
   const[copyDone,setCopyDone]=useState(false);
+  const[showPdfCompressor,setShowPdfCompressor]=useState(false);
+  const[pdfCompressFile,setPdfCompressFile]=useState(null);
+  const[pdfCompressPreset,setPdfCompressPreset]=useState("email");
+  const[pdfCompressing,setPdfCompressing]=useState(false);
+  const[pdfCompressProgress,setPdfCompressProgress]=useState("");
+  const[pdfCompressDone,setPdfCompressDone]=useState(false);
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
 
@@ -2300,6 +2314,44 @@ export default function App(){
   function updateNote(dayId,itemId,note){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.map(i=>i.id===itemId?{...i,notes:note}:i)}:d)}));}
   function updateItemOverride(dayId,itemId,field,value){mutate(it=>({...it,days:it.days.map(d=>d.id===dayId?{...d,items:d.items.map(item=>item.id===itemId?{...item,overrides:{...item.overrides,[field]:value||undefined}}:item)}:d)}));}
 
+  async function runPdfCompress(){
+    if(!pdfCompressFile||pdfCompressing)return;
+    setPdfCompressing(true);setPdfCompressDone(false);setPdfCompressProgress("Loading libraries...");
+    try{
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      const pdfjsLib=window.pdfjsLib;
+      pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const preset=PDF_PRESETS.find(p=>p.id===pdfCompressPreset)||PDF_PRESETS[1];
+      const arrayBuffer=await pdfCompressFile.arrayBuffer();
+      setPdfCompressProgress("Reading PDF...");
+      const pdfDoc=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+      const {jsPDF}=window.jspdf;
+      const doc=new jsPDF({unit:"pt",format:"a4",compress:true});
+      const A4W=595.28,A4H=841.89;
+      for(let i=1;i<=pdfDoc.numPages;i++){
+        setPdfCompressProgress(`Compressing page ${i} of ${pdfDoc.numPages}...`);
+        if(i>1)doc.addPage();
+        const page=await pdfDoc.getPage(i);
+        const vp=page.getViewport({scale:preset.scale});
+        const canvas=document.createElement("canvas");
+        canvas.width=vp.width;canvas.height=vp.height;
+        const ctx=canvas.getContext("2d");
+        await page.render({canvasContext:ctx,viewport:vp}).promise;
+        const imgData=canvas.toDataURL("image/jpeg",preset.quality);
+        doc.addImage(imgData,"JPEG",0,0,A4W,A4H,"","FAST");
+      }
+      setPdfCompressProgress("Saving...");
+      const baseName=pdfCompressFile.name.replace(/\.pdf$/i,"");
+      doc.save(`${baseName}_${preset.id}.pdf`);
+      setPdfCompressDone(true);setPdfCompressProgress("");
+    }catch(err){
+      setPdfCompressProgress("Error: "+err.message);
+    }finally{
+      setPdfCompressing(false);
+    }
+  }
+
   const filtered=allProducts.filter(p=>{
     const catOk=libCat==="All"||p.category===libCat||(libCat==="Custom"&&p.custom);
     const s=libSearch.toLowerCase();
@@ -2335,6 +2387,60 @@ export default function App(){
           </div>
         </div>
       )}
+      {showPdfCompressor&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.55)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{if(!pdfCompressing)setShowPdfCompressor(false);}}>
+          <div style={{background:C.white,borderRadius:12,padding:28,width:440,boxShadow:"0 24px 64px rgba(0,0,0,0.28)",maxWidth:"94vw"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+              <div style={{fontFamily:F.heading,fontSize:15,fontWeight:700,color:C.navy}}>Compress PDF</div>
+              {!pdfCompressing&&<button onClick={()=>setShowPdfCompressor(false)} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:C.grey400,lineHeight:1}}>×</button>}
+            </div>
+            <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:18}}>Print your itinerary first using Print / PDF, then upload the saved file here to reduce its size before sending.</div>
+
+            {/* File drop zone */}
+            <label style={{display:"block",border:`2px dashed ${pdfCompressFile?C.teal:C.grey200}`,borderRadius:8,padding:"20px 16px",textAlign:"center",cursor:"pointer",background:pdfCompressFile?`${C.teal}08`:C.grey100,marginBottom:18,transition:"border-color 0.2s"}}>
+              <input type="file" accept=".pdf,application/pdf" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f){setPdfCompressFile(f);setPdfCompressDone(false);setPdfCompressProgress("");}}}/>
+              {pdfCompressFile?(
+                <div>
+                  <div style={{fontSize:18,marginBottom:4}}>📄</div>
+                  <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>{pdfCompressFile.name}</div>
+                  <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:2}}>{(pdfCompressFile.size/1024/1024).toFixed(2)} MB · click to change</div>
+                </div>
+              ):(
+                <div>
+                  <div style={{fontSize:22,marginBottom:6}}>⬆</div>
+                  <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Click to select a PDF</div>
+                  <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:2}}>Select the PDF you printed from this app</div>
+                </div>
+              )}
+            </label>
+
+            {/* Quality presets */}
+            <div style={{fontFamily:F.body,fontSize:11,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Output quality</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
+              {PDF_PRESETS.map(preset=>(
+                <button key={preset.id} onClick={()=>setPdfCompressPreset(preset.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",border:`2px solid ${pdfCompressPreset===preset.id?C.navy:C.grey200}`,borderRadius:8,background:pdfCompressPreset===preset.id?`${C.navy}08`:C.white,cursor:"pointer",textAlign:"left",transition:"border-color 0.15s"}}>
+                  <div style={{width:14,height:14,borderRadius:"50%",border:`2px solid ${pdfCompressPreset===preset.id?C.navy:C.grey400}`,background:pdfCompressPreset===preset.id?C.navy:"transparent",flexShrink:0}}/>
+                  <div>
+                    <div style={{fontFamily:F.body,fontSize:12,fontWeight:700,color:C.navy}}>{preset.label}</div>
+                    <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:1}}>{preset.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Action */}
+            {pdfCompressProgress&&<div style={{fontFamily:F.body,fontSize:11,color:C.teal,marginBottom:10,textAlign:"center"}}>{pdfCompressProgress}</div>}
+            {pdfCompressDone&&<div style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.teal,marginBottom:10,textAlign:"center"}}>✓ Compressed PDF downloaded — check your Downloads folder.</div>}
+            <div style={{display:"flex",gap:8}}>
+              {!pdfCompressing&&<button onClick={()=>setShowPdfCompressor(false)} style={{fontFamily:F.body,fontSize:12,color:C.grey600,background:C.grey100,border:"none",borderRadius:6,padding:"9px 16px",cursor:"pointer"}}>Close</button>}
+              <button onClick={runPdfCompress} disabled={!pdfCompressFile||pdfCompressing} style={{flex:1,fontFamily:F.heading,fontSize:12,fontWeight:700,letterSpacing:"0.05em",textTransform:"uppercase",color:C.white,background:pdfCompressFile&&!pdfCompressing?"#4a6fa5":C.grey400,border:"none",borderRadius:6,padding:"9px 16px",cursor:pdfCompressFile&&!pdfCompressing?"pointer":"default",transition:"background 0.2s"}}>
+                {pdfCompressing?"Compressing...":"Compress & Download"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {dayPicker&&active&&(
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(25,41,87,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDayPicker(null)}>
           <div style={{background:C.white,borderRadius:10,padding:20,minWidth:300,boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
@@ -2396,6 +2502,7 @@ export default function App(){
               </div>
               <ShareButton itinerary={active} allProducts={allProducts} productImages={productImages} activeCurrency={activeCurrency} fxRates={fxRates}/>
               <button onClick={()=>printCompressed(`${active.clientName||"Itinerary"} — ${active.title}`)} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
+              <button onClick={()=>{setShowPdfCompressor(true);setPdfCompressFile(null);setPdfCompressDone(false);setPdfCompressProgress("");}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:"#4a6fa5",border:"none",borderRadius:5,padding:"6px 12px"}}>Compress PDF</button>
               <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages} activeCurrency={activeCurrency} fxRates={fxRates}/>
               <button onClick={()=>{
                 const html=generateOfflineHTML(active,allProducts,productImages,activeCurrency,fxRates);
