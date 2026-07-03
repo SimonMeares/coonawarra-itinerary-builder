@@ -96,7 +96,65 @@ const BUILT_IN_PRODUCTS = [
 
 // ─── Sample itineraries ───────────────────────────────────────────────────────
 function buildSamples(){
-  return[{
+  return[
+  {
+    id:"sample_bluewren_3n",ceRef:"SAMPLE-002",rezdyRef:"",
+    title:"Three-Night Limestone Coast Experience",
+    clientName:"",clientEmail:"",guestCount:2,
+    arrivalDate:"",departureDate:"",origin:"",
+    status:"draft",totalPrice:"",expiryDate:"",bookByDate:"",
+    showPricing:false,tradeMode:false,commission:20,printFlow:false,
+    agentLogo:"",agentName:"",agentRef:"",
+    intro:"This itinerary has been prepared exclusively for you by Coonawarra Experiences. Three nights on the Limestone Coast gives you the time to really settle in — to move through the region without feeling rushed, to spend a proper morning on a working farm, to sit down to a long lunch and a special dinner, and to find the pace that makes this part of the world so easy to love.",
+    hostBio:"Simon and Kerry Meares are your personal hosts throughout this journey — locals who left Melbourne to build a life and a business on the Limestone Coast. Every experience in this itinerary reflects a connection they have built with the region's people, places and producers.",
+    welcomeMessage:"",emailIntro:"",
+    beforeYouArrive:DEFAULT_BEFORE_YOU_ARRIVE,
+    terms:DEFAULT_TERMS,notes:"",
+    coverImage:"",attachments:[],
+    guestInfo:{name1:"",name2:"",email:"",phone:"",country:"",dietary:"",medical:"",celebrating:"",notes:""},
+    internalNotes:"Sample itinerary — Warrawindi Escapes, Blue Wren · 3 nights, 2 hosted days · Mayura dinner night 3 (Thu/Fri/Sat only)",
+    showInclusions:true,followUpDate:"",statusHistory:[],
+    days:[
+      {
+        id:"s_bw3n_d1",title:"Check In to Your Private Retreat",date:"",location:"Warrawindi Escapes, Penola",
+        dayNotes:"Your Limestone Coast journey begins the moment you arrive at Warrawindi. Blue Wren is ready for you — open a bottle of wine, settle onto the deck and let the quiet of the property settle in around you. This is a 3,000-acre working sustainable farm, and the stillness here is something most travellers do not expect. The cedar hot tub is yours whenever you want it, and the paddock views carry on further than the eye can follow. This evening, as the light softens over the property, your hosts at Warrawindi will lead you out onto the farm for one of the most memorable evenings the Limestone Coast has to offer.",
+        internalNotes:"",
+        items:[
+          {id:"s_bw3n_d1_i1",productId:"p-blue-wren",notes:"Welcome wine and artisan chocolate on arrival. A freshly prepared roast dinner will be delivered to your retreat this evening.",overrides:{}},
+          {id:"s_bw3n_d1_i2",productId:"p-warrawindi-sunset",notes:"5:00 PM — Farm tour, open fire dinner and stargazing on the Warrawindi property",overrides:{}},
+        ]
+      },
+      {
+        id:"s_bw3n_d2",title:"Your Privately Hosted Limestone Coast Day",date:"",location:"Naracoorte · Coonawarra · Penola",
+        dayNotes:"Simon is at Blue Wren at 9:00 AM. From here, the day takes you underground into prehistory, through the winemaking heart of the Limestone Coast and into places not found on any public map. Allow the day to unfold at its own pace — there is no need to rush anything. You will be back at Warrawindi by around 5:15 PM, with the evening free to enjoy the retreat at your own pace.",
+        internalNotes:"",
+        items:[
+          {id:"s_bw3n_d2_i1",productId:"p-naracoorte-caves",notes:"10:15 AM – 11:30 AM · Pick-up from Blue Wren at 9:00 AM — approximately 45 minutes to Naracoorte",overrides:{}},
+          {id:"s_bw3n_d2_i2",productId:"p-ottelia",notes:"12:30 PM · Seasonal set-menu lunch featuring the finest produce of the Limestone Coast",overrides:{}},
+          {id:"s_bw3n_d2_i3",productId:"p-railway-siding",notes:"2:00 PM · A brief stop at the symbolic heart of Coonawarra wine country",overrides:{}},
+          {id:"s_bw3n_d2_i4",productId:"p-wynns",notes:"2:15 PM · Icon tasting and private cellar tour inside the historic 1896 Gables winery",overrides:{}},
+          {id:"s_bw3n_d2_i5",productId:"p-confido",notes:"3:30 PM · Hosted by the producers in their working olive grove",overrides:{}},
+          {id:"s_bw3n_d2_i6",productId:"p-kangaroo-sanctuary",notes:"4:30 PM · Return to Blue Wren approximately 5:15 PM",overrides:{}},
+        ]
+      },
+      {
+        id:"s_bw3n_d3",title:"A Morning on the Farm",date:"",location:"Warrawindi Escapes, Penola",
+        dayNotes:"Your morning belongs to Warrawindi. The exclusive farm experience is a private three-hour journey through the workings of the property — the animals, the land and the story behind one of the Limestone Coast's most distinctive sustainable farms. You will be back well before midday, after which the afternoon is entirely your own. The cedar hot tub is waiting. So is the deck. Take the time you need.\n\nThis evening you head to Mayura Station for dinner. The Chef's Table degustation is one of the most celebrated dining experiences in regional Australia — a five-course wagyu journey hosted by the producers themselves. Available Thursday, Friday and Saturday evenings only.",
+        internalNotes:"Mayura — Thu/Fri/Sat only. Confirm availability when booking. Max 10 guests at Chef's Table.",
+        items:[
+          {id:"s_bw3n_d3_i1",productId:"p-warrawindi-exclusive",notes:"9:00 AM – 12:00 PM · Private three-hour exclusive farm experience on the Warrawindi property",overrides:{}},
+          {id:"s_bw3n_d3_i2",productId:"p-mayura",notes:"7:00 PM · Five-course wagyu degustation at Mayura Chef's Table · Thursday, Friday and Saturday evenings only",overrides:{}},
+        ]
+      },
+      {
+        id:"s_bw3n_d4",title:"Farewell from the Limestone Coast",date:"",location:"Warrawindi Escapes, Penola",
+        dayNotes:"Take your time this morning. Enjoy a relaxed breakfast with the provisions in your retreat, and if the mood takes you, a last walk around the property before you pack up. The farm is worth one more quiet look.\n\nThank you for choosing to spend time with us on the Limestone Coast. It has been a genuine pleasure having you here, and we hope the past few days have given you a real feel for why this region holds such a special place in our hearts.\n\nSafe travels on your onward journey — wherever the road takes you next. We hope it will not be long before the Limestone Coast calls you back.\n\nWith warm wishes,\nSimon and Kerry Meares\nCoonawarra Experiences",
+        internalNotes:"",items:[]
+      },
+    ],
+    createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
+  },
+  {
     id:"sample_warrawindi_2n",ceRef:"SAMPLE-001",rezdyRef:"",
     title:"Two-Night Limestone Coast Experience",
     clientName:"",clientEmail:"",guestCount:2,
@@ -145,6 +203,7 @@ function buildSamples(){
     createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
   }];
 }
+// Note: buildSamples returns [3-night, 2-night] — 3-night appears first in list
 
 const CATS=["All","Day Tours","Stay & Tour Packages","Transfers & Journeys","Experience Components","Accommodation","Custom"];
 const CAT_S={"All":"All","Day Tours":"Day Tours","Stay & Tour Packages":"Packages","Transfers & Journeys":"Transfers","Experience Components":"Components","Accommodation":"Stays","Custom":"Custom"};
@@ -443,6 +502,7 @@ input,textarea,select,button{font-family:inherit;}
   .cover-page{page-break-after:always;}
   .divider-page{page-break-before:always;page-break-after:always;}
   img{break-inside:avoid;page-break-inside:avoid;}
+  .print-break{padding-top:8mm;}
   @page{margin:0;size:A4;}
   @page:not(:first){margin:12mm;}
   .page-content{padding:12mm;}
@@ -1134,69 +1194,60 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
           </div>
         </div>
       ):(
-        /* ── GUEST COVER — full page ── */
-        <div className="cover-page no-print-border" style={{background:C.navy,position:"relative",overflow:"hidden",minHeight:480,display:"flex",flexDirection:"column",justifyContent:"space-between",borderRadius:10,marginBottom:20}}>
-          {/* Hero image — full bleed */}
-          {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>}
-          {/* Dark overlay so text is always readable */}
-          <div style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",background:itinerary.coverImage?"linear-gradient(to bottom, rgba(25,41,87,0.55) 0%, rgba(25,41,87,0.3) 40%, rgba(25,41,87,0.85) 100%)":"rgba(25,41,87,1)"}}/>
-          {/* Teal accent circle — only when no hero image */}
-          {!itinerary.coverImage&&<div style={{position:"absolute",top:0,right:0,width:200,height:200,background:C.teal,opacity:0.08,borderRadius:"0 0 0 100%"}}/>}
-          {/* Content */}
-          <div style={{position:"relative",padding:"32px 36px",flex:1,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
-            {/* Top — logo */}
-            <div>
-              <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:80,width:"auto",display:"block",marginBottom:0}} crossOrigin="anonymous"/>
+        /* ── GUEST COVER — brand design: navy header + cream body ── */
+        <div className="cover-page no-print-border" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
+          {/* Navy header strip with logo */}
+          <div style={{background:C.navy,padding:"22px 32px"}}>
+            <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:72,width:"auto",display:"block"}} crossOrigin="anonymous"/>
+          </div>
+          {/* Cream body */}
+          <div style={{background:C.sandLight,padding:"32px 36px"}}>
+            {/* Title */}
+            <div style={{fontFamily:F.heading,fontSize:38,fontWeight:700,color:C.navy,lineHeight:1.05,marginBottom:10}}>{itinerary.title||"Private Itinerary"}</div>
+            {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:16,fontStyle:"italic",color:C.teal,marginBottom:itinerary.welcomeMessage?12:20}}>Prepared for {itinerary.clientName}</div>}
+            {itinerary.welcomeMessage&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:C.navy,lineHeight:1.7,maxWidth:520,marginBottom:20,whiteSpace:"pre-wrap"}}>{itinerary.welcomeMessage}</div>}
+            {/* Sand rule */}
+            <div style={{height:2,background:C.sand,marginTop:(!itinerary.clientName&&!itinerary.welcomeMessage)?16:0,marginBottom:16}}/>
+            {/* Key details row */}
+            <div style={{display:"flex",gap:18,flexWrap:"wrap",marginBottom:14}}>
+              {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
+              {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
+              {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
+              <div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Duration</span> · {fmtDuration(itinerary.days)}</div>
+              {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600}}><span style={{color:C.navy,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
             </div>
-            {/* Middle — title and welcome */}
-            <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",paddingTop:32,paddingBottom:24}}>
-              <div style={{fontFamily:F.heading,fontSize:36,fontWeight:700,color:C.white,lineHeight:1.05,marginBottom:12,textShadow:itinerary.coverImage?"0 2px 8px rgba(0,0,0,0.4)":"none"}}>{itinerary.title||"Private Itinerary"}</div>
-              {itinerary.clientName&&<div style={{fontFamily:F.serif,fontSize:16,fontStyle:"italic",color:C.sand,marginBottom:16,textShadow:itinerary.coverImage?"0 1px 4px rgba(0,0,0,0.4)":"none"}}>Prepared for {itinerary.clientName}</div>}
-              {itinerary.welcomeMessage&&<div style={{fontFamily:F.serif,fontSize:14,fontStyle:"italic",color:"rgba(255,255,255,0.85)",lineHeight:1.7,maxWidth:520,textShadow:itinerary.coverImage?"0 1px 4px rgba(0,0,0,0.4)":"none",whiteSpace:"pre-wrap"}}>{itinerary.welcomeMessage}</div>}
-            </div>
-            {/* Bottom — details, price, highlights */}
-            <div>
-              {/* Key details row */}
-              <div style={{display:"flex",gap:18,flexWrap:"wrap",marginBottom:14}}>
-                {itinerary.arrivalDate&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Arrival</span> · {fmtDate(itinerary.arrivalDate)}</div>}
-                {itinerary.departureDate&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Departure</span> · {fmtDate(itinerary.departureDate)}</div>}
-                {itinerary.guestCount&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Guests</span> · {itinerary.guestCount}</div>}
-                <div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Duration</span> · {fmtDuration(itinerary.days)}</div>
-                {itinerary.origin&&<div style={{fontFamily:F.body,fontSize:12,color:"rgba(255,255,255,0.75)"}}><span style={{color:C.sand,fontWeight:600}}>Origin</span> · {itinerary.origin}</div>}
+            {/* Total price */}
+            {itinerary.totalPrice&&(
+              <div style={{display:"inline-block",background:C.navy,borderRadius:8,padding:"8px 18px",marginBottom:16}}>
+                <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Total investment</div>
+                <div style={{fontFamily:F.heading,fontSize:22,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
+                {currency&&currency!=="AUD"&&(()=>{
+                  const num=parseFloat((itinerary.totalPrice||"").replace(/[^0-9.]/g,""));
+                  if(!num||!fxRates)return null;
+                  const rate=fxRates[currency];
+                  const symbols={NZD:"NZ$",GBP:"£",USD:"US$",SGD:"S$",EUR:"€"};
+                  if(!rate)return null;
+                  return<div style={{fontFamily:F.body,fontSize:11,color:C.sand,marginTop:1}}>approx. {symbols[currency]}{Math.round(num*rate).toLocaleString()} {currency}</div>;
+                })()}
               </div>
-              {/* Total price */}
-              {itinerary.totalPrice&&(
-                <div style={{display:"inline-block",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"8px 18px",marginBottom:16}}>
-                  <div style={{fontFamily:F.body,fontSize:9,color:C.sand,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>Total investment</div>
-                  <div style={{fontFamily:F.heading,fontSize:22,fontWeight:700,color:C.white}}>{itinerary.totalPrice}</div>
-                  {currency&&currency!=="AUD"&&(()=>{
-                    const num=parseFloat((itinerary.totalPrice||"").replace(/[^0-9.]/g,""));
-                    if(!num||!fxRates)return null;
-                    const rate=fxRates[currency];
-                    const symbols={NZD:"NZ$",GBP:"£",USD:"US$",SGD:"S$",EUR:"€"};
-                    if(!rate)return null;
-                    return<div style={{fontFamily:F.body,fontSize:11,color:C.sand,marginTop:1}}>approx. {symbols[currency]}{Math.round(num*rate).toLocaleString()} {currency}</div>;
-                  })()}
-                </div>
-              )}
-              {/* Highlights strip */}
-              {highlights.length>0&&(
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-                  {highlights.map((h,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"4px 10px"}}>
-                      <span style={{fontSize:13}}>{h.icon}</span>
-                      <span style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.85)"}}>{h.label}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* Footer bar */}
-              <div style={{paddingTop:12,borderTop:"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-                <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.3)"}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
-                <div style={{display:"flex",gap:12}}>
-                  {itinerary.expiryDate&&<div style={{fontFamily:F.body,fontSize:9,color:C.terra,fontWeight:600}}>Quote valid until {fmtDate(itinerary.expiryDate)}</div>}
-                  {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.4)"}}><span style={{color:C.sand}}>Ref</span> {itinerary.ceRef}</div>}
-                </div>
+            )}
+            {/* Highlights strip */}
+            {highlights.length>0&&(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+                {highlights.map((h,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"4px 10px"}}>
+                    <span style={{fontSize:13}}>{h.icon}</span>
+                    <span style={{fontFamily:F.body,fontSize:11,color:C.navy}}>{h.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Footer bar */}
+            <div style={{paddingTop:12,borderTop:`1px solid ${C.grey200}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Valid 1 April 2027 – 31 March 2028 · AUD incl. 10% GST</div>
+              <div style={{display:"flex",gap:12}}>
+                {itinerary.expiryDate&&<div style={{fontFamily:F.body,fontSize:9,color:C.terra,fontWeight:600}}>Quote valid until {fmtDate(itinerary.expiryDate)}</div>}
+                {itinerary.ceRef&&<div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}><span style={{color:C.teal}}>Ref</span> {itinerary.ceRef}</div>}
               </div>
             </div>
           </div>
@@ -1207,6 +1258,12 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,padding:"18px 22px",marginBottom:16,borderLeft:`4px solid ${C.teal}`}}>
           <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.teal,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>{isTrade?"Product overview":"About this journey"}</div>
           <div style={{fontFamily:F.serif,fontSize:14,color:C.navy,lineHeight:1.75,whiteSpace:"pre-wrap"}}>{itinerary.intro}</div>
+        </div>
+      )}
+      {/* Hero image — below intro */}
+      {!isTrade&&itinerary.coverImage&&(
+        <div style={{marginBottom:20,borderRadius:10,overflow:"hidden",...IMG_WRAP}}>
+          <img src={itinerary.coverImage} alt="" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
         </div>
       )}
 
@@ -1247,7 +1304,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
               const imgs=productImages[p.id]||[];
               const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
               return(
-                <div key={item.id} style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,overflow:"hidden",marginBottom:10,borderLeft:`4px solid ${typeColor(p.type)}`}}>
+                <div key={item.id} style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,overflow:"hidden",marginBottom:18,borderLeft:`4px solid ${typeColor(p.type)}`,breakInside:"avoid",pageBreakInside:"avoid",WebkitColumnBreakInside:"avoid"}}>
                   {imgs.length>0&&<ImageStrip images={imgs}/>}
                   <div style={{padding:"12px 14px"}}>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
@@ -1916,7 +1973,7 @@ export default function App(){
   const[bView,setBView]=useState("edit");
   const[editTab,setEditTab]=useState("itinerary");
   const[showInternal,setSI]=useState(false);
-  const[itineraries,setIts]=useState(()=>{const stored=loadIts();if(stored.some(it=>it.id==="sample_warrawindi_2n"))return stored;const samples=buildSamples();const merged=[...samples,...stored];saveIts(merged);return merged;});
+  const[itineraries,setIts]=useState(()=>{const stored=loadIts();const toAdd=buildSamples().filter(s=>!stored.some(it=>it.id===s.id));if(toAdd.length===0)return stored;const merged=[...toAdd,...stored];saveIts(merged);return merged;});
   const[activeId,setActiveId]=useState(null);
   const[productImages,setPImgs]=useState(()=>loadImgs());
   const[customProducts,setCPs]=useState(()=>loadCP());
