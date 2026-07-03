@@ -1164,11 +1164,21 @@ function DayItem({item,onRemove,onMoveUp,onMoveDown,onNoteChange,isFirst,isLast,
                 <textarea value={item.overrides?.description||""} onChange={e=>onOverrideChange(dayId,item.id,"description",e.target.value)} placeholder={p.description||"Add custom description..."} rows={3} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,resize:"vertical",boxSizing:"border-box"}}/>
               </div>
               <div>
-                <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Inclusions (one per line)</div>
-                <textarea value={item.overrides?.inclusions||""} onChange={e=>onOverrideChange(dayId,item.id,"inclusions",e.target.value)} placeholder={p.inclusions?.join("\n")||"Add inclusions..."} rows={4} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,resize:"vertical",boxSizing:"border-box"}}/>
+                <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Additional inclusions <span style={{color:C.grey400,fontSize:10}}>(one per line — appended to base inclusions)</span></div>
+                <textarea value={item.overrides?.inclusions||""} onChange={e=>onOverrideChange(dayId,item.id,"inclusions",e.target.value)} placeholder={"Add extra inclusions here..."} rows={3} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:13,fontFamily:F.body,resize:"vertical",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Check-in</div>
+                  <input value={item.overrides?.checkIn||""} onChange={e=>onOverrideChange(dayId,item.id,"checkIn",e.target.value)} placeholder={p.checkIn||"e.g. 3:00 PM"} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:12,fontFamily:F.body,boxSizing:"border-box"}}/>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:11,color:C.grey600,marginBottom:2}}>Check-out</div>
+                  <input value={item.overrides?.checkOut||""} onChange={e=>onOverrideChange(dayId,item.id,"checkOut",e.target.value)} placeholder={p.checkOut||"e.g. 10:00 AM"} style={{width:"100%",border:`1px solid ${C.grey200}`,borderRadius:4,padding:"5px 8px",fontSize:12,fontFamily:F.body,boxSizing:"border-box"}}/>
+                </div>
               </div>
               {hasOverrides&&(
-                <button onClick={()=>{onOverrideChange(dayId,item.id,"name","");onOverrideChange(dayId,item.id,"priceDisplay","");onOverrideChange(dayId,item.id,"description","");onOverrideChange(dayId,item.id,"inclusions","");}} style={{background:"none",border:"none",cursor:"pointer",color:C.terra,fontSize:11,textDecoration:"underline",alignSelf:"flex-start"}}>
+                <button onClick={()=>{onOverrideChange(dayId,item.id,"name","");onOverrideChange(dayId,item.id,"priceDisplay","");onOverrideChange(dayId,item.id,"description","");onOverrideChange(dayId,item.id,"inclusions","");onOverrideChange(dayId,item.id,"checkIn","");onOverrideChange(dayId,item.id,"checkOut","");}} style={{background:"none",border:"none",cursor:"pointer",color:C.terra,fontSize:11,textDecoration:"underline",alignSelf:"flex-start"}}>
                   Reset to product defaults
                 </button>
               )}
@@ -1438,8 +1448,12 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
               if(!p)return null;
               const ovName=item.overrides?.name||p?.name;
               const ovDescription=item.overrides?.description||p?.description;
-              const ovInclusions=item.overrides?.inclusions?item.overrides.inclusions.split('\n').filter(l=>l.trim()):p?.inclusions;
+              const baseInclusions=p?.inclusions||[];
+              const extraInclusions=item.overrides?.inclusions?item.overrides.inclusions.split('\n').filter(l=>l.trim()):[];
+              const ovInclusions=[...baseInclusions,...extraInclusions];
               const ovPriceDisplay=item.overrides?.priceDisplay||null;
+              const ovCheckIn=item.overrides?.checkIn||p?.checkIn||"";
+              const ovCheckOut=item.overrides?.checkOut||p?.checkOut||"";
               const imgs=productImages[p.id]||[];
               const isTiered=["tiered_per_person_by_group","tiered_per_couple_by_group"].includes(p.pricing.structure);
               return(
@@ -1495,6 +1509,12 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
                       <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8}}>
                         {p.duration&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.duration}</span>}
                         {p.departures&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.departures}</span>}
+                      </div>
+                    )}
+                    {(ovCheckIn||ovCheckOut)&&(
+                      <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:8,padding:"5px 10px",background:C.sandLight,borderRadius:5,borderLeft:`2px solid ${C.sand}`}}>
+                        {ovCheckIn&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{fontWeight:700,color:C.navy}}>Check-in</span> · {ovCheckIn}</span>}
+                        {ovCheckOut&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey600}}><span style={{fontWeight:700,color:C.navy}}>Check-out</span> · {ovCheckOut}</span>}
                       </div>
                     )}
                     {ovDescription&&<p style={{fontFamily:F.body,fontSize:12,color:C.grey600,lineHeight:1.5,marginBottom:8}}>{ovDescription}</p>}
