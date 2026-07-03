@@ -497,15 +497,14 @@ input,textarea,select,button{font-family:inherit;}
 .pdf-drop:hover{border-color:#40c0c0;}
 @media print{
   .no-print{display:none!important;}
-  body{background:white;}
-  .print-break{page-break-before:always;}
-  .cover-page{page-break-after:always;}
-  .divider-page{page-break-before:always;page-break-after:always;}
+  body{background:white;margin:0;padding:0;}
+  .print-break{page-break-before:always;break-before:page;}
+  .cover-page{page-break-after:always;break-after:page;}
+  .divider-page{page-break-before:always;page-break-after:always;break-before:page;break-after:page;}
   img{break-inside:avoid;page-break-inside:avoid;}
-  .print-break{padding-top:8mm;}
-  @page{margin:0;size:A4;}
-  @page:not(:first){margin:12mm;}
-  .page-content{padding:12mm;}
+  @page{margin:15mm 12mm;size:A4;}
+  @page :first{margin:0;}
+  .preview-wrapper{padding:0!important;}
   .print-page-num::after{content:counter(page);}
   body{counter-reset:page;}
   .print-break{counter-increment:page;}
@@ -1135,7 +1134,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
       {/* Cover — trade and guest have separate layouts */}
       {isTrade?(
         /* ── TRADE COVER ── */
-        <div style={{background:C.navy,borderRadius:10,marginBottom:16,position:"relative",overflow:"hidden"}}>
+        <div className="cover-page" style={{background:C.navy,borderRadius:10,marginBottom:16,position:"relative",overflow:"hidden"}}>
           {itinerary.coverImage&&<img src={itinerary.coverImage} alt="" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center",opacity:0.12,display:"block"}} crossOrigin="anonymous"/>}
           <div style={{position:"relative",padding:"28px 32px"}}>
             {/* CE logo + agent logo row */}
@@ -1195,7 +1194,7 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         </div>
       ):(
         /* ── GUEST COVER — brand design: navy header + cream body ── */
-        <div className="no-print-border" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
+        <div className="no-print-border cover-page" style={{borderRadius:10,marginBottom:20,overflow:"hidden"}}>
           {/* Navy header strip with logo */}
           <div style={{background:C.navy,padding:"22px 32px"}}>
             <img src={LOGO_URL} alt="Coonawarra Experiences" style={{height:72,width:"auto",display:"block"}} crossOrigin="anonymous"/>
@@ -2352,7 +2351,7 @@ export default function App(){
             </div>
           </div>
         ):bView==="preview"?(
-          <div style={{padding:"20px 18px"}}>
+          <div className="preview-wrapper" style={{padding:"20px 18px"}}>
             <Preview itinerary={active} productImages={productImages} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
           </div>
         ):(
