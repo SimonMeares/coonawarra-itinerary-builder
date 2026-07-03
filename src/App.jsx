@@ -1428,7 +1428,7 @@ function Preview({itinerary,productImages,partnerLogos,showInternal,allProducts,
                         </div>
                       )}
                     </div>
-                    {(p.duration||p.departures)&&(
+                    {(p.type==="private"||p.type==="small_group")&&(p.duration||p.departures)&&(
                       <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8}}>
                         {p.duration&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.duration}</span>}
                         {p.departures&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{p.departures}</span>}
