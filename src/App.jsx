@@ -429,9 +429,9 @@ function printCompressed(title){
 
 // ─── PDF Compression ──────────────────────────────────────────────────────────
 const PDF_PRESETS=[
-  {id:"archive",label:"Archive quality",desc:"Best for printing or archiving · ~15% smaller",scale:3.0,quality:0.93},
-  {id:"email",label:"Email / web",desc:"Ideal for sending to guests · ~35% smaller",scale:2.5,quality:0.83},
-  {id:"mobile",label:"Mobile sharing",desc:"WhatsApp / Messenger · ~55% smaller",scale:1.8,quality:0.70},
+  {id:"archive",label:"Archive quality",desc:"Sharp text · photos ~20% smaller · safe for reprinting",quality:0.88},
+  {id:"email",label:"Email / web",desc:"Sharp text · photos ~40% smaller · ideal for guests",quality:0.70},
+  {id:"mobile",label:"Mobile sharing",desc:"Sharp text · photos ~60% smaller · WhatsApp / Messenger",quality:0.50},
 ];
 function loadScript(src){return new Promise((resolve,reject)=>{if(document.querySelector(`script[src="${src}"]`)){resolve();return;}const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});}
 
@@ -2316,37 +2316,69 @@ export default function App(){
 
   async function runPdfCompress(){
     if(!pdfCompressFile||pdfCompressing)return;
-    setPdfCompressing(true);setPdfCompressDone(false);setPdfCompressProgress("Loading libraries...");
+    setPdfCompressing(true);setPdfCompressDone(false);setPdfCompressProgress("Loading library...");
     try{
-      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
-      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-      const pdfjsLib=window.pdfjsLib;
-      pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js");
+      const{PDFDocument,PDFName}=window.PDFLib;
       const preset=PDF_PRESETS.find(p=>p.id===pdfCompressPreset)||PDF_PRESETS[1];
-      const arrayBuffer=await pdfCompressFile.arrayBuffer();
       setPdfCompressProgress("Reading PDF...");
-      const pdfDoc=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
-      const {jsPDF}=window.jspdf;
-      const doc=new jsPDF({unit:"pt",format:"a4",compress:true});
-      const A4W=595.28,A4H=841.89;
-      for(let i=1;i<=pdfDoc.numPages;i++){
-        setPdfCompressProgress(`Compressing page ${i} of ${pdfDoc.numPages}...`);
-        if(i>1)doc.addPage();
-        const page=await pdfDoc.getPage(i);
-        const vp=page.getViewport({scale:preset.scale});
-        const canvas=document.createElement("canvas");
-        canvas.width=vp.width;canvas.height=vp.height;
-        const ctx=canvas.getContext("2d");
-        await page.render({canvasContext:ctx,viewport:vp}).promise;
-        const imgData=canvas.toDataURL("image/jpeg",preset.quality);
-        doc.addImage(imgData,"JPEG",0,0,A4W,A4H,"","FAST");
+      const arrayBuffer=await pdfCompressFile.arrayBuffer();
+      const pdfDoc=await PDFDocument.load(arrayBuffer,{ignoreEncryption:true,updateMetadata:false});
+
+      // Find all image XObjects in the PDF
+      const allObjects=[...pdfDoc.context.enumerateIndirectObjects()];
+      const imageObjects=allObjects.filter(([,obj])=>{
+        if(!obj||typeof obj!=="object"||!obj.dict?.get)return false;
+        const sub=obj.dict.get(PDFName.of("Subtype"));
+        return sub?.toString()==="/Image";
+      });
+
+      if(imageObjects.length===0){
+        setPdfCompressProgress("No embedded images found — the PDF may already be optimised.");
+        setTimeout(()=>setPdfCompressProgress(""),4000);
+        setPdfCompressing(false);return;
       }
+
+      let processed=0;
+      for(const[,obj] of imageObjects){
+        const filter=obj.dict.get(PDFName.of("Filter"));
+        const filterStr=filter?.toString()||"";
+        const isJpeg=filterStr.includes("DCTDecode");
+        if(!isJpeg)continue; // skip non-JPEG streams (vector content etc.)
+
+        processed++;
+        setPdfCompressProgress(`Recompressing photo ${processed} of ${imageObjects.length}...`);
+
+        const jpegBytes=obj.contents;
+        if(!jpegBytes?.length)continue;
+
+        const blob=new Blob([jpegBytes],{type:"image/jpeg"});
+        const url=URL.createObjectURL(blob);
+        try{
+          const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+          const canvas=document.createElement("canvas");
+          canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+          canvas.getContext("2d").drawImage(img,0,0);
+          const newBlob=await new Promise(res=>canvas.toBlob(res,"image/jpeg",preset.quality));
+          const newBytes=new Uint8Array(await newBlob.arrayBuffer());
+          if(newBytes.length<jpegBytes.length){
+            obj.contents=newBytes;
+            obj.dict.set(PDFName.of("Length"),pdfDoc.context.obj(newBytes.length));
+          }
+        }finally{URL.revokeObjectURL(url);}
+      }
+
       setPdfCompressProgress("Saving...");
-      const baseName=pdfCompressFile.name.replace(/\.pdf$/i,"");
-      doc.save(`${baseName}_${preset.id}.pdf`);
+      const compressedBytes=await pdfDoc.save({useObjectStreams:true});
+      const outBlob=new Blob([compressedBytes],{type:"application/pdf"});
+      const outUrl=URL.createObjectURL(outBlob);
+      const a=document.createElement("a");a.href=outUrl;
+      a.download=`${pdfCompressFile.name.replace(/\.pdf$/i,"")}_${preset.id}.pdf`;
+      a.click();URL.revokeObjectURL(outUrl);
       setPdfCompressDone(true);setPdfCompressProgress("");
     }catch(err){
       setPdfCompressProgress("Error: "+err.message);
+      console.error(err);
     }finally{
       setPdfCompressing(false);
     }
