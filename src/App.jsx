@@ -2162,6 +2162,7 @@ export default function App(){
   const[dayPicker,setDayPicker]=useState(null); // {product} when open
   const[sidebarCollapsed,setSidebarCollapsed]=useState(false);
   const[copyFromId,setCopyFromId]=useState("");
+  const[copyDone,setCopyDone]=useState(false);
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
 
@@ -2724,29 +2725,28 @@ export default function App(){
                 {editTab==="content"&&(
                   <>
                     {/* Copy content from another itinerary */}
-                    <div style={{background:C.sandLight,border:`1px solid ${C.sand}`,borderRadius:8,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                      <span style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.navy,whiteSpace:"nowrap"}}>Copy content from:</span>
-                      <select value={copyFromId} onChange={e=>setCopyFromId(e.target.value)} style={{fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",outline:"none",flex:1,minWidth:120}}>
-                        <option value="">Select an itinerary...</option>
-                        {itineraries.filter(it=>it.id!==active.id).map(it=>(
-                          <option key={it.id} value={it.id}>{it.title||"Untitled"}{it.clientName?` — ${it.clientName}`:""}</option>
-                        ))}
-                      </select>
-                      <button onClick={()=>{
-                        const src=itineraries.find(it=>it.id===copyFromId);
-                        if(!src)return;
-                        mutate(it=>({...it,
-                          welcomeMessage:src.welcomeMessage||it.welcomeMessage,
-                          intro:src.intro||it.intro,
-                          hostBio:src.hostBio||it.hostBio,
-                          beforeYouArrive:src.beforeYouArrive||it.beforeYouArrive,
-                          howToBook:src.howToBook||it.howToBook,
-                          terms:src.terms||it.terms,
-                          notes:src.notes||it.notes,
-                          coverImage:src.coverImage||it.coverImage,
-                        }));
-                        setCopyFromId("");
-                      }} disabled={!copyFromId} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:copyFromId?C.teal:C.grey400,border:"none",borderRadius:5,padding:"5px 14px",cursor:copyFromId?"pointer":"default",whiteSpace:"nowrap"}}>Copy</button>
+                    <div style={{background:C.sandLight,border:`1px solid ${C.sand}`,borderRadius:8,padding:"10px 14px",marginBottom:16}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.navy,whiteSpace:"nowrap"}}>Copy content from:</span>
+                        <select value={copyFromId} onChange={e=>{setCopyFromId(e.target.value);setCopyDone(false);}} style={{fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",outline:"none",flex:1,minWidth:120}}>
+                          <option value="">Select an itinerary...</option>
+                          {itineraries.filter(it=>it.id!==active.id).map(it=>(
+                            <option key={it.id} value={it.id}>{it.title||"Untitled"}{it.clientName?` — ${it.clientName}`:""}</option>
+                          ))}
+                        </select>
+                        <button onClick={()=>{
+                          const srcId=copyFromId;
+                          const src=itineraries.find(i=>i.id===srcId);
+                          if(!src)return;
+                          const fields={welcomeMessage:src.welcomeMessage,intro:src.intro,hostBio:src.hostBio,beforeYouArrive:src.beforeYouArrive,howToBook:src.howToBook,terms:src.terms,notes:src.notes,coverImage:src.coverImage};
+                          setIts(prev=>{const next=prev.map(i=>i.id===activeId?{...i,...fields,updatedAt:new Date().toISOString()}:i);saveIts(next);return next;});
+                          setCopyFromId("");
+                          setCopyDone(true);
+                          setTimeout(()=>setCopyDone(false),3000);
+                        }} disabled={!copyFromId} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:copyFromId?C.teal:C.grey400,border:"none",borderRadius:5,padding:"5px 14px",cursor:copyFromId?"pointer":"default",whiteSpace:"nowrap"}}>Copy</button>
+                        {copyDone&&<span style={{fontFamily:F.body,fontSize:11,color:C.teal,fontWeight:600}}>✓ Copied — scroll down to review</span>}
+                      </div>
+                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:6}}>Copies welcome message, intro, host bio, Before You Arrive, How to Book, terms and cover image. Overwrites existing content in those fields.</div>
                     </div>
                     {active.tradeMode&&(
                       <SectionBox title="Trade Partner Details" accent={C.terra}>
