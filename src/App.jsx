@@ -2341,93 +2341,112 @@ export default function App(){
       const arrayBuffer=await pdfCompressFile.arrayBuffer();
       const pdfDoc=await PDFDocument.load(arrayBuffer,{ignoreEncryption:true,updateMetadata:false});
 
-      const allObjects=[...pdfDoc.context.enumerateIndirectObjects()];
-      const imageObjects=allObjects.filter(([,obj])=>{
-        if(!obj||typeof obj!=="object"||!obj.dict?.get)return false;
-        const sub=obj.dict.get(PDFName.of("Subtype"));
-        return sub?.toString()==="/Image";
-      });
+      // Collect image XObjects — scan via page resources AND global enumeration
+      const imageSet=new Set();
+      const scanDict=(dict)=>{
+        if(!dict||!dict.get)return;
+        try{
+          const xo=dict.get(PDFName.of("XObject"));
+          if(xo&&xo.entries){
+            for(const[,val] of xo.entries()){
+              try{
+                const obj=val?.tag?pdfDoc.context.lookup(val):val;
+                if(!obj||!obj.dict?.get)continue;
+                const sub=obj.dict.get(PDFName.of("Subtype"))?.toString();
+                if(sub==="/Image")imageSet.add(obj);
+                else if(sub==="/Form"){const res=obj.dict.get(PDFName.of("Resources"));if(res)scanDict(res);}
+              }catch(e){}
+            }
+          }
+        }catch(e){}
+      };
+      for(const page of pdfDoc.getPages()){try{scanDict(page.node.get(PDFName.of("Resources")));}catch(e){}}
+      for(const[,obj] of pdfDoc.context.enumerateIndirectObjects()){
+        try{if(obj?.dict?.get&&obj.dict.get(PDFName.of("Subtype"))?.toString()==="/Image")imageSet.add(obj);}catch(e){}
+      }
+      const imageObjects=[...imageSet];
+      setPdfCompressProgress(`Found ${imageObjects.length} image${imageObjects.length!==1?"s":""} — compressing...`);
+      await new Promise(r=>setTimeout(r,80));
 
       if(imageObjects.length===0){
-        setPdfCompressProgress("No embedded images found — PDF may already be optimised.");
-        setTimeout(()=>{setPdfCompressProgress("");setPdfCompressing(false);},3000);
-        return;
+        setPdfCompressDone(true);
+        setPdfCompressProgress("No images detected. Open browser console (F12) after your next attempt to see diagnostic info.");
+        setPdfCompressing(false);return;
       }
 
-      let processed=0,skipped=0;
-      for(const[,obj] of imageObjects){
-        const filter=obj.dict.get(PDFName.of("Filter"));
-        const filterStr=filter?.toString()||"";
-        const isJpeg=filterStr.includes("DCTDecode");
-        const isFlate=filterStr.includes("FlateDecode");
-        if(!isJpeg&&!isFlate){skipped++;continue;}
-
+      let replaced=0;
+      for(let idx=0;idx<imageObjects.length;idx++){
+        const obj=imageObjects[idx];
         const w=obj.dict.get(PDFName.of("Width"))?.value?.();
         const h=obj.dict.get(PDFName.of("Height"))?.value?.();
-        if(!w||!h||w*h<2500){skipped++;continue;} // skip tiny images (<50×50)
-
-        processed++;
-        setPdfCompressProgress(`Compressing image ${processed} of ${imageObjects.length-skipped}...`);
-
+        if(!w||!h||w*h<1600)continue;
+        const contents=obj.contents;
+        if(!contents?.length)continue;
+        const filter=obj.dict.get(PDFName.of("Filter"))?.toString()||"";
+        const isJpeg=filter.includes("DCTDecode");
+        const isFlate=filter.includes("FlateDecode");
+        if(!isJpeg&&!isFlate){
+          console.log(`[PDF] Image ${idx+1} ${w}x${h} filter="${filter}" — skipped (not JPEG/Flate)`);
+          continue;
+        }
+        setPdfCompressProgress(`Compressing image ${idx+1} of ${imageObjects.length} (${w}\u00d7${h})...`);
+        await new Promise(r=>setTimeout(r,0));
         try{
-          let canvas,ctx;
-          canvas=document.createElement("canvas");
+          const canvas=document.createElement("canvas");
           canvas.width=w;canvas.height=h;
-          ctx=canvas.getContext("2d");
-
+          const ctx=canvas.getContext("2d");
           if(isJpeg){
-            // JPEG: decode via Image element
-            const url=URL.createObjectURL(new Blob([obj.contents],{type:"image/jpeg"}));
-            try{
-              const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
-              ctx.drawImage(img,0,0);
-            }finally{URL.revokeObjectURL(url);}
-          } else {
-            // FlateDecode: decompress with pako, reverse PNG predictor, draw pixel data
-            const cs=obj.dict.get(PDFName.of("ColorSpace"))?.toString()||"/DeviceRGB";
-            if(!cs.includes("DeviceRGB")&&!cs.includes("DeviceGray")){skipped++;continue;}
-            const ch=cs.includes("DeviceGray")?1:3;
-            const dp=obj.dict.get(PDFName.of("DecodeParms"));
-            const predictor=dp?.get?.(PDFName.of("Predictor"))?.value?.()||1;
-            let raw;
-            try{raw=pako.inflate(obj.contents);}catch(e){skipped++;continue;}
-            const pixels=predictor>=10?reversePngPredictor(raw,w,h,ch):raw;
-            const imgData=ctx.createImageData(w,h);
+            const url=URL.createObjectURL(new Blob([contents],{type:"image/jpeg"}));
+            try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});ctx.drawImage(img,0,0);}
+            finally{URL.revokeObjectURL(url);}
+          }else{
+            let raw;try{raw=pako.inflate(contents);}catch(e){console.log(`[PDF] pako.inflate failed on image ${idx+1}`,e);continue;}
+            const len=raw.length;
+            let ch=0,usePred=false;
+            if(len===h*(w*3+1)){ch=3;usePred=true;}
+            else if(len===h*(w*4+1)){ch=4;usePred=true;}
+            else if(len===h*(w+1)){ch=1;usePred=true;}
+            else if(len===h*w*3){ch=3;}
+            else if(len===h*w*4){ch=4;}
+            else if(len===h*w){ch=1;}
+            else{console.log(`[PDF] Image ${idx+1} ${w}x${h} raw=${len} expected≈${h*w*3} — layout unknown, skipping`);continue;}
+            const px=usePred?reversePngPredictor(raw,w,h,ch):raw;
+            const id=ctx.createImageData(w,h);
             for(let i=0;i<w*h;i++){
-              if(ch===3){imgData.data[i*4]=pixels[i*3];imgData.data[i*4+1]=pixels[i*3+1];imgData.data[i*4+2]=pixels[i*3+2];}
-              else{const v=pixels[i];imgData.data[i*4]=imgData.data[i*4+1]=imgData.data[i*4+2]=v;}
-              imgData.data[i*4+3]=255;
+              const o=i*4;
+              if(ch>=3){id.data[o]=px[i*ch];id.data[o+1]=px[i*ch+1];id.data[o+2]=px[i*ch+2];}
+              else{const v=px[i];id.data[o]=id.data[o+1]=id.data[o+2]=v;}
+              id.data[o+3]=255;
             }
-            ctx.putImageData(imgData,0,0);
+            ctx.putImageData(id,0,0);
           }
-
           const newBlob=await new Promise(res=>canvas.toBlob(res,"image/jpeg",preset.quality));
           const newBytes=new Uint8Array(await newBlob.arrayBuffer());
-
-          // Only replace if actually smaller
-          if(newBytes.length<obj.contents.length){
+          if(newBytes.length<contents.length){
             obj.contents=newBytes;
             obj.dict.set(PDFName.of("Filter"),PDFName.of("DCTDecode"));
             obj.dict.set(PDFName.of("Length"),pdfDoc.context.obj(newBytes.length));
             try{obj.dict.delete(PDFName.of("DecodeParms"));}catch(e){}
+            replaced++;
+            console.log(`[PDF] Image ${idx+1} ${w}x${h}: ${Math.round(contents.length/1024)}KB -> ${Math.round(newBytes.length/1024)}KB`);
           }
-        }catch(e){skipped++;} // skip any image that errors
+        }catch(e){console.warn(`[PDF] Image ${idx+1} error:`,e);}
       }
-
       setPdfCompressProgress("Saving...");
       const compressedBytes=await pdfDoc.save({useObjectStreams:true});
       const origMB=(pdfCompressFile.size/1024/1024).toFixed(1);
       const newMB=(compressedBytes.length/1024/1024).toFixed(1);
+      const pct=Math.round((1-compressedBytes.length/pdfCompressFile.size)*100);
       const outBlob=new Blob([compressedBytes],{type:"application/pdf"});
       const outUrl=URL.createObjectURL(outBlob);
       const a=document.createElement("a");a.href=outUrl;
       a.download=`${pdfCompressFile.name.replace(/\.pdf$/i,"")}_${preset.id}.pdf`;
       a.click();URL.revokeObjectURL(outUrl);
       setPdfCompressDone(true);
-      setPdfCompressProgress(`Done — ${origMB} MB → ${newMB} MB (${Math.round((1-compressedBytes.length/pdfCompressFile.size)*100)}% smaller)`);
+      setPdfCompressProgress(`${origMB} MB \u2192 ${newMB} MB \u00b7 ${pct}% smaller \u00b7 ${replaced} of ${imageObjects.length} image${imageObjects.length!==1?"s":""} compressed`);
     }catch(err){
       setPdfCompressProgress("Error: "+err.message);
-      console.error(err);
+      console.error("[PDF Compress error]",err);
     }finally{
       setPdfCompressing(false);
     }
@@ -2673,482 +2692,4 @@ export default function App(){
                   {it.clientName&&<span>{it.clientName}</span>}
                   <span>{it.days.length} {it.days.length===1?"day":"days"}</span>
                   {it.arrivalDate&&<span>Arrives {fmtDate(it.arrivalDate)}</span>}
-                  <span>Updated {new Date(it.updatedAt).toLocaleDateString("en-AU")}</span>
-                  {it.statusHistory?.length>1&&<span style={{color:C.grey400}}>· {it.statusHistory.length} status changes</span>}
-                </div>
-              </div>
-              <div style={{display:"flex",gap:5,flexShrink:0}}>
-                <button onClick={()=>{
-                  // Backfill CE ref if missing
-                  if(!it.ceRef){
-                    const ref=generateCERef(itineraries.filter(i=>i.id!==it.id));
-                    const next=itineraries.map(i=>i.id===it.id?{...i,ceRef:ref}:i);
-                    setIts(next);saveIts(next);
-                  }
-                  setActiveId(it.id);setTab("builder");setBView("edit");setEditTab("itinerary");
-                }} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:C.navy,border:"none",borderRadius:5,padding:"5px 12px"}}>Open</button>
-                <button onClick={()=>dupIt(it)} style={{fontFamily:F.body,fontSize:11,color:C.navy,background:"transparent",border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 10px"}}>Copy</button>
-                <button onClick={()=>deleteIt(it.id)} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}40`,borderRadius:5,padding:"5px 10px"}}>Delete</button>
-              </div>
-            </div>
-          ))})()}
-          {/* Product usage tracker */}
-          {itineraries.length>0&&(()=>{
-            const usage=getProductUsage(itineraries,allProducts).slice(0,8);
-            if(!usage.length)return null;
-            return(
-              <div style={{marginTop:28}}>
-                <div style={{fontFamily:F.heading,fontSize:14,fontWeight:700,color:C.navy,marginBottom:12}}>Most used products</div>
-                <div style={{background:C.white,border:`1px solid ${C.grey200}`,borderRadius:10,overflow:"hidden"}}>
-                  {usage.map((p,i)=>(
-                    <div key={p.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderBottom:i<usage.length-1?`1px solid ${C.grey100}`:"none"}}>
-                      <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.terra,width:24,textAlign:"center",flexShrink:0}}>{p.usageCount}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.category}</div>
-                      </div>
-                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>{p.usageCount} itinerar{p.usageCount===1?"y":"ies"}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* Builder tab */}
-      {tab==="builder"&&(
-        !active?(
-          <div style={{textAlign:"center",padding:"70px 20px"}}>
-            <div style={{fontFamily:F.heading,fontSize:18,color:C.navy,marginBottom:6}}>No itinerary open</div>
-            <div style={{fontFamily:F.body,fontSize:13,color:C.grey400,marginBottom:18}}>Create a new itinerary or open a saved one.</div>
-            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button onClick={createNew} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.white,background:C.terra,border:"none",borderRadius:6,padding:"9px 22px"}}>+ New Itinerary</button>
-              <button onClick={()=>setTab("saved")} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"9px 22px"}}>Open Saved</button>
-              <button onClick={()=>setShowTM(true)} style={{fontFamily:F.heading,fontSize:11,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.white,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"9px 22px"}}>📋 Use Template</button>
-            </div>
-          </div>
-        ):bView==="preview"?(
-          <div className="preview-wrapper" style={{padding:"20px 18px"}}>
-            <Preview itinerary={active} productImages={productImages} partnerLogos={partnerLogos} showInternal={showInternal} allProducts={allProducts} currency={activeCurrency} fxRates={fxRates}/>
-          </div>
-        ):(
-          <div className="no-print" style={{display:"flex",height:"calc(100vh - 84px)",overflow:"hidden"}}>
-            {/* Library */}
-            <div style={{background:C.white,borderRight:`1px solid ${C.grey200}`,display:"flex",flexDirection:"column",overflow:sidebarCollapsed?"hidden":"auto",width:sidebarCollapsed?0:300,minWidth:sidebarCollapsed?0:300,transition:"width 0.25s, min-width 0.25s",flexShrink:0}}>
-              <div style={{padding:"10px 12px",borderBottom:`1px solid ${C.grey200}`,background:C.grey100}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:7}}>
-                  <div style={{fontFamily:F.heading,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>Product Library</div>
-                  <div style={{display:"flex",gap:4}}>
-                    <BulkImageUploader allProducts={allProducts} productImages={productImages} onImagesChange={handleImagesChange}/>
-                    <button onClick={()=>{setShowForm(true);setEditProduct(null);setLibCat("Custom");}} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
-                  </div>
-                </div>
-                <input value={libSearch} onChange={e=>setLibSrch(e.target.value)} placeholder="Search products..." style={{width:"100%",fontFamily:F.body,fontSize:12,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 9px",outline:"none",background:C.white,marginBottom:7}}/>
-                <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                  {CATS.map(cat=>(
-                    <button key={cat} onClick={()=>{setLibCat(cat);setShowForm(false);}} style={{fontFamily:F.body,fontSize:9,fontWeight:libCat===cat?700:400,color:libCat===cat?C.white:C.grey600,background:libCat===cat?C.navy:"transparent",border:libCat===cat?"none":`1px solid ${C.grey200}`,borderRadius:10,padding:"2px 7px"}}>
-                      {CAT_S[cat]}{cat==="Custom"?` (${customProducts.length})`:""}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{flex:1,overflowY:"auto",padding:8}}>
-                {showForm&&<ProductForm initial={editProduct} onSave={handleSaveProduct} onCancel={()=>{setShowForm(false);setEditProduct(null);}}/>}
-                {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
-                {filtered.map(p=>(
-                  <LibraryCard key={p.id} product={p} images={productImages[p.id]||[]} onImagesChange={handleImagesChange} partnerLogo={partnerLogos[p.id]||""} onLogoChange={handleLogoChange} showInternal={showInternal}
-                    onAdd={product=>{
-                      if(!active?.days?.length)return;
-                      if(active.days.length===1){addItem(active.days[0].id,product);}
-                      else{setDayPicker({product});}
-                    }}
-                    onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
-                    onDuplicate={()=>handleDuplicateProduct(p)}
-                    onDelete={()=>handleDeleteProduct(p.id)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={()=>setSidebarCollapsed(c=>!c)}
-              title={sidebarCollapsed?"Show product library":"Hide product library"}
-              style={{alignSelf:"center",flexShrink:0,background:C.navy,color:C.white,border:"none",borderRadius:sidebarCollapsed?"0 4px 4px 0":"4px 0 0 4px",width:16,height:48,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",zIndex:5}}
-            >
-              {sidebarCollapsed?"›":"‹"}
-            </button>
-            {/* Right panel */}
-            <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1,minWidth:0}}>
-              {/* Meta bar */}
-              <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"8px 14px"}}>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
-                  <input value={active.title} onChange={e=>mutate(it=>({...it,title:e.target.value}))} style={{fontFamily:F.heading,fontSize:15,fontWeight:700,color:C.navy,border:"none",outline:"none",background:"transparent",flex:"1 1 180px",minWidth:0}} placeholder="Itinerary title"/>
-                  <div style={{position:"relative"}}>
-                    <input value={active.clientName} onChange={e=>{
-                      mutate(it=>({...it,clientName:e.target.value}));
-                    }} placeholder="Client name" style={{...fi,width:140}}
-                    list="past-clients"/>
-                    <datalist id="past-clients">
-                      {[...new Set(itineraries.filter(i=>i.id!==activeId&&i.clientName).map(i=>i.clientName))].map(name=>(
-                        <option key={name} value={name}/>
-                      ))}
-                    </datalist>
-                  </div>
-                  <input value={active.clientEmail} onChange={e=>mutate(it=>({...it,clientEmail:e.target.value}))} placeholder="Client email" style={{...fi,width:180}}/>
-                  <input type="number" value={active.guestCount} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||2}))} min={1} max={20} title="Guests" style={{...fi,width:55}}/>
-                  <input value={active.origin} onChange={e=>mutate(it=>({...it,origin:e.target.value}))} placeholder="Origin" style={{...fi,width:110}}/>
-                  <select value={active.status} onChange={e=>{
-                    const newStatus=e.target.value;
-                    mutate(it=>({...it,status:newStatus,
-                      statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
-                    }));
-                  }} style={{...fi,color:SC[active.status],fontWeight:600}}>
-                    <option value="draft">Enquiry</option><option value="review">Proposal</option><option value="published">Confirmed</option>
-                  </select>
-                  <div style={{display:"flex",alignItems:"center",gap:4,background:C.sandLight,borderRadius:5,padding:"3px 8px",flexShrink:0}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em"}}>{active.ceRef||"—"}</span>
-                  </div>
-                  <input value={active.rezdyRef||""} onChange={e=>mutate(it=>({...it,rezdyRef:e.target.value}))} placeholder="Rezdy ref..." style={{...fi,width:100}} title="Rezdy booking reference"/>
-                </div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Guests</span>
-                    <input type="number" min={1} max={20} value={active.guestCount||""} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||""}))} placeholder="2" style={{...fi,width:52,textAlign:"center"}}/>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Arrival</span>
-                    <input type="date" value={active.arrivalDate||""} onChange={e=>{
-                      const d=e.target.value;
-                      mutate(it=>{
-                        const noDates=it.days.every(day=>!day.date);
-                        const base=new Date(d+'T12:00:00');
-                        return{...it,arrivalDate:d,days:noDates?it.days.map((day,i)=>{const nd=new Date(base);nd.setDate(base.getDate()+i);return{...day,date:nd.toISOString().split('T')[0]};}):it.days};
-                      });
-                    }} style={fi}/>
-                    {active.arrivalDate&&<button onClick={()=>mutate(it=>{const base=new Date(it.arrivalDate+'T12:00:00');return{...it,days:it.days.map((d,i)=>{const nd=new Date(base);nd.setDate(base.getDate()+i);return{...d,date:nd.toISOString().split('T')[0]};})};} )} style={{fontFamily:F.body,fontSize:9,color:C.teal,background:"transparent",border:`1px solid ${C.teal}40`,borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap"}} title="Fill day dates from arrival">Fill dates</button>}
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Departure</span>
-                    <input type="date" value={active.departureDate||""} onChange={e=>mutate(it=>({...it,departureDate:e.target.value}))} style={fi}/>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Total price</span>
-                    <input value={active.totalPrice||""} onChange={e=>mutate(it=>({...it,totalPrice:e.target.value}))} placeholder="e.g. From $3,975 per couple" style={{...fi,width:220}}/>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Quote valid until</span>
-                    <input type="date" value={active.expiryDate||""} onChange={e=>mutate(it=>({...it,expiryDate:e.target.value}))} style={{...fi}}/>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.06em",textTransform:"uppercase"}}>Version</span>
-                    <input value={active.version||""} onChange={e=>mutate(it=>({...it,version:e.target.value}))} placeholder="e.g. 2" style={{...fi,width:60}} title="Version number — shown on cover alongside status badge"/>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Follow up</span>
-                    <input type="date" value={active.followUpDate||""} onChange={e=>mutate(it=>({...it,followUpDate:e.target.value}))} style={{...fi,borderColor:active.followUpDate&&new Date(active.followUpDate)<=new Date()?C.terra:C.grey200}}/>
-                  </div>
-                  {active.tradeMode&&(
-                    <div style={{display:"flex",alignItems:"center",gap:5}}>
-                      <span style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.terra,letterSpacing:"0.06em",textTransform:"uppercase"}}>Book by</span>
-                      <input type="date" value={active.bookByDate||""} onChange={e=>mutate(it=>({...it,bookByDate:e.target.value}))} style={{...fi,borderColor:C.terra}}/>
-                    </div>
-                  )}
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show inclusions</span>
-                    <div onClick={()=>mutate(it=>({...it,showInclusions:it.showInclusions===false?true:false}))} style={{width:32,height:17,borderRadius:9,background:active.showInclusions===false?C.grey200:C.teal,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                      <div style={{position:"absolute",top:2,left:active.showInclusions===false?2:14,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
-                    </div>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto"}}>
-                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show item pricing</span>
-                    <div onClick={()=>mutate(it=>({...it,showPricing:!it.showPricing}))} style={{width:32,height:17,borderRadius:9,background:active.showPricing?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                      <div style={{position:"absolute",top:2,left:active.showPricing?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
-                    </div>
-                    <span style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginLeft:8}}>Trade mode</span>
-                    <div onClick={()=>mutate(it=>({...it,tradeMode:!it.tradeMode,showPricing:!it.tradeMode}))} style={{width:32,height:17,borderRadius:9,background:active.tradeMode?C.terra:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                      <div style={{position:"absolute",top:2,left:active.tradeMode?14:2,width:13,height:13,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
-                    </div>
-                    {active.tradeMode&&(
-                      <select value={active.commission||20} onChange={e=>mutate(it=>({...it,commission:parseInt(e.target.value)}))} style={{fontFamily:F.body,fontSize:11,color:C.terra,fontWeight:700,border:`1px solid ${C.terra}40`,borderRadius:5,padding:"3px 6px",outline:"none",background:C.white}}>
-                        {[10,15,20,25].map(c=><option key={c} value={c}>{c}% comm</option>)}
-                      </select>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Edit sub-tabs */}
-              <div style={{background:C.white,borderBottom:`1px solid ${C.grey200}`,padding:"0 14px",display:"flex",gap:2}}>
-                {EDIT_TABS.map(({k,l})=>(
-                  <button key={k} onClick={()=>setEditTab(k)} style={{fontFamily:F.body,fontSize:12,fontWeight:editTab===k?600:400,color:editTab===k?C.navy:C.grey400,background:"transparent",border:"none",borderBottom:editTab===k?`2px solid ${C.terra}`:"2px solid transparent",padding:"8px 14px",marginBottom:-1}}>
-                    {l}{k==="guest"&&active.guestInfo?.name1?" ✓":""}
-                    {k==="attachments"&&active.attachments?.length>0?` (${active.attachments.length})`:""}
-                  </button>
-                ))}
-              </div>
-
-              {/* Edit content */}
-              <div style={{flex:1,overflowY:"auto",padding:"14px 14px 28px"}}>
-
-                {/* Itinerary tab */}
-                {editTab==="itinerary"&&(
-                  <>
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:8,marginBottom:10}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Print layout</div>
-                        <div style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{active.printFlow?"Days flow continuously — compact layout":"Each day starts on a new page"}</div>
-                      </div>
-                      <div onClick={()=>mutate(it=>({...it,printFlow:!it.printFlow}))} style={{width:36,height:20,borderRadius:10,background:active.printFlow?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                        <div style={{position:"absolute",top:3,left:active.printFlow?16:3,width:14,height:14,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
-                      </div>
-                    </div>
-                    {active.days.map((day,di)=>(
-                      <DayCard key={day.id} day={day} dayIndex={di} totalDays={active.days.length}
-                        productImages={productImages} allProducts={allProducts} showPricing={active.showPricing}
-                        onUpdate={updateDay} onRemoveItem={removeItem} onMoveItem={moveItem} onReorderItems={reorderItems}
-                        onNoteChange={updateNote} onOverrideChange={updateItemOverride} onRemove={()=>removeDay(day.id)}
-                        onDuplicate={()=>duplicateDay(day.id)}
-                        onMoveDay={(dir)=>mutate(it=>{const days=[...it.days];const ni=di+dir;if(ni<0||ni>=days.length)return it;[days[di],days[ni]]=[days[ni],days[di]];return{...it,days};})}
-                        isFirstDay={di===0} isLastDay={di===active.days.length-1}
-                        onDayDragStart={fromIdx=>{setDragDayFrom(fromIdx);}}
-                        onDayDragOver={toIdx=>{if(toIdx!==dragDayFrom)setDragDayOver(toIdx);}}
-                        onDayDrop={toIdx=>{if(toIdx==null){setDragDayFrom(null);setDragDayOver(null);return;}if(dragDayFrom!=null&&toIdx!=null)reorderDays(dragDayFrom,toIdx);setDragDayFrom(null);setDragDayOver(null);}}
-                        isDayDragging={dragDayFrom===di} isDayDragOver={dragDayOver===di}
-                      />
-                    ))}
-                    <button onClick={addDay} style={{width:"100%",fontFamily:F.body,fontSize:13,fontWeight:600,color:C.navy,background:C.white,border:`2px dashed ${C.grey200}`,borderRadius:10,padding:"13px"}}>+ Add Day</button>
-                  </>
-                )}
-
-                {/* Guest info tab */}
-                {editTab==="guest"&&(
-                  <SectionBox title="Guest Information (internal only)">
-                    <GuestInfoForm guestInfo={active.guestInfo} onChange={gi=>mutate(it=>({...it,guestInfo:gi}))}/>
-                  </SectionBox>
-                )}
-
-                {/* Content tab */}
-                {editTab==="content"&&(
-                  <>
-                    {/* Copy content from another itinerary */}
-                    <div style={{background:C.sandLight,border:`1px solid ${C.sand}`,borderRadius:8,padding:"10px 14px",marginBottom:16}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                        <span style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.navy,whiteSpace:"nowrap"}}>Copy content from:</span>
-                        <select value={copyFromId} onChange={e=>{setCopyFromId(e.target.value);setCopyDone(false);}} style={{fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",outline:"none",flex:1,minWidth:120}}>
-                          <option value="">Select an itinerary...</option>
-                          {itineraries.filter(it=>it.id!==active.id).map(it=>(
-                            <option key={it.id} value={it.id}>{it.title||"Untitled"}{it.clientName?` — ${it.clientName}`:""}</option>
-                          ))}
-                        </select>
-                        <button onClick={()=>{
-                          const srcId=copyFromId;
-                          const src=itineraries.find(i=>i.id===srcId);
-                          if(!src)return;
-                          const fields={welcomeMessage:src.welcomeMessage,intro:src.intro,hostBio:src.hostBio,beforeYouArrive:src.beforeYouArrive,howToBook:src.howToBook,terms:src.terms,notes:src.notes,coverImage:src.coverImage};
-                          setIts(prev=>{const next=prev.map(i=>i.id===activeId?{...i,...fields,updatedAt:new Date().toISOString()}:i);saveIts(next);return next;});
-                          setCopyFromId("");
-                          setCopyDone(true);
-                          setTimeout(()=>setCopyDone(false),3000);
-                        }} disabled={!copyFromId} style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.white,background:copyFromId?C.teal:C.grey400,border:"none",borderRadius:5,padding:"5px 14px",cursor:copyFromId?"pointer":"default",whiteSpace:"nowrap"}}>Copy</button>
-                        {copyDone&&<span style={{fontFamily:F.body,fontSize:11,color:C.teal,fontWeight:600}}>✓ Copied — scroll down to review</span>}
-                      </div>
-                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:6}}>Copies welcome message, intro, host bio, Before You Arrive, How to Book, terms and cover image. Overwrites existing content in those fields.</div>
-                    </div>
-                    {active.tradeMode&&(
-                      <SectionBox title="Trade Partner Details" accent={C.terra}>
-                        <div style={{display:"flex",gap:8,marginBottom:10}}>
-                          <div style={{flex:2}}>
-                            <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agency / partner name</label>
-                            <input value={active.agentName||""} onChange={e=>mutate(it=>({...it,agentName:e.target.value}))} placeholder="e.g. Nyhavn Rejser" style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none"}}/>
-                          </div>
-                          <div style={{flex:1}}>
-                            <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agent ref / file no.</label>
-                            <input value={active.agentRef||""} onChange={e=>mutate(it=>({...it,agentRef:e.target.value}))} placeholder="e.g. NYH-2027-042" style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 8px",outline:"none"}}/>
-                          </div>
-                        </div>
-                        <div>
-                          <label style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",display:"block",marginBottom:3}}>Agent logo (appears on trade cover)</label>
-                          {active.agentLogo?(
-                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                              <img src={active.agentLogo} alt="Agent logo" style={{height:40,maxWidth:160,objectFit:"contain",background:C.white,border:`1px solid ${C.grey200}`,borderRadius:4,padding:4}}/>
-                              <button onClick={()=>mutate(it=>({...it,agentLogo:""}))} style={{fontFamily:F.body,fontSize:11,color:C.terra,background:"transparent",border:`1px solid ${C.terra}30`,borderRadius:4,padding:"3px 10px"}}>Remove</button>
-                            </div>
-                          ):(
-                            <AgentLogoUploader onUpload={url=>mutate(it=>({...it,agentLogo:url}))}/>
-                          )}
-                        </div>
-                      </SectionBox>
-                    )}
-                    <SectionBox title="Cover Hero Image (optional)">
-                      <div style={{marginBottom:8}}>
-                        {active.coverImage?(
-                          <div style={{position:"relative",marginBottom:8}}>
-                            <img src={active.coverImage} alt="Cover" style={{width:"100%",height:100,objectFit:"cover",borderRadius:6,display:"block"}} crossOrigin="anonymous"/>
-                            <button onClick={()=>mutate(it=>({...it,coverImage:""}))} style={{position:"absolute",top:4,right:4,background:C.terra,color:C.white,border:"none",borderRadius:4,padding:"2px 8px",fontFamily:F.body,fontSize:10,cursor:"pointer"}}>Remove</button>
-                          </div>
-                        ):(
-                          <CoverImageUploader onUpload={url=>mutate(it=>({...it,coverImage:url}))}/>
-                        )}
-                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>Appears as a full-bleed background behind the navy cover. Use a landscape landscape photo — vineyard, coastline, wildlife.</div>
-                      </div>
-                    </SectionBox>
-                    <SectionBox title="Welcome Message (appears on cover)">
-                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>A personal note on the cover page, below the client name. Set in italic serif. Leave blank to hide.</div>
-                      <textarea value={active.welcomeMessage||""} onChange={e=>mutate(it=>({...it,welcomeMessage:e.target.value}))} placeholder={`We're delighted to have put together this journey for you — a few days of wine, wilderness and warm Limestone Coast hospitality.\n\nWe look forward to welcoming you in person.`} style={{width:"100%",fontFamily:F.serif,fontStyle:"italic",fontSize:13,color:C.navy,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="Introduction / Journey Overview">
-                      <textarea value={active.intro||""} onChange={e=>mutate(it=>({...it,intro:e.target.value}))} placeholder="Write an opening paragraph for the itinerary — what makes this journey special, the tone you want to set. Appears between the cover and Day 1." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:90,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="Host Introduction (Simon & Kerry)">
-                      <textarea value={active.hostBio||""} onChange={e=>mutate(it=>({...it,hostBio:e.target.value}))} placeholder="A short introduction to Simon and Kerry as hosts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="Before You Arrive">
-                      <textarea value={active.beforeYouArrive||""} onChange={e=>mutate(it=>({...it,beforeYouArrive:e.target.value}))} placeholder="Practical information for guests — getting here, what to pack, mobile coverage, dining notes, emergency contacts. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:160,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="How to Book (guest view only)">
-                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>Deposit, payment and contact details. Appears before Terms & Conditions in the guest itinerary. Leave blank to hide.</div>
-                      <textarea value={active.howToBook||""} onChange={e=>mutate(it=>({...it,howToBook:e.target.value}))} placeholder="To confirm your booking, a 10% deposit is required..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="Terms & Conditions">
-                      <textarea value={active.terms||""} onChange={e=>mutate(it=>({...it,terms:e.target.value}))} placeholder="Terms and conditions. Leave blank to hide." style={{width:"100%",fontFamily:F.body,fontSize:11,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:130,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="Email Introduction">
-                      <div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginBottom:6}}>Opening paragraph for the Gmail draft email — personal note before the itinerary summary. Leave blank for the default.</div>
-                      <textarea value={active.emailIntro||""} onChange={e=>mutate(it=>({...it,emailIntro:e.target.value}))} placeholder={`Hi ${active.clientName||"[name]"},\n\nThank you for your interest in a private journey with us. I've put together the following itinerary based on what we discussed...`} style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:80,outline:"none"}}/>
-                    </SectionBox>
-                    <SectionBox title="Internal Notes (never shown to client or agent)">
-                      <textarea value={active.internalNotes||""} onChange={e=>mutate(it=>({...it,internalNotes:e.target.value}))} placeholder="Operational reminders, supplier contacts, logistics, follow-up notes..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.terra,border:`1px solid ${C.terra}30`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:70,outline:"none",background:"#fff8f6"}}/>
-                    </SectionBox>
-                    <SectionBox title="Footer Note (optional)">
-                      <textarea value={active.notes||""} onChange={e=>mutate(it=>({...it,notes:e.target.value}))} placeholder="Any additional note to appear in the itinerary footer..." style={{width:"100%",fontFamily:F.body,fontSize:12,color:C.text,border:`1px solid ${C.grey200}`,borderRadius:6,padding:"8px 12px",resize:"vertical",minHeight:48,outline:"none"}}/>
-                    </SectionBox>
-                  </>
-                )}
-
-                {/* Attachments tab */}
-                {editTab==="attachments"&&(
-                  <SectionBox title="Document Attachments">
-                    <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,marginBottom:12,lineHeight:1.5}}>
-                      Attach PDFs to this itinerary — rate sheets, partner information packs, the See South Australia Collective dossier, wine region maps. Attachments are listed in the itinerary footer and stored in the browser.
-                    </div>
-                    <AttachmentManager attachments={active.attachments} onUpdate={atts=>mutate(it=>({...it,attachments:atts}))}/>
-                  </SectionBox>
-                )}
-
-                {/* Financials tab — internal only, never exported */}
-                {editTab==="financials"&&(()=>{
-                  const pax=active.guestCount||2;
-                  const gstDiv=showExGST?1.1:1;
-                  const rows=active.days.flatMap(d=>d.items.map(item=>{
-                    const p=findProduct(allProducts,item.productId);
-                    if(!p)return null;
-                    const sellRaw=calcSellForProduct(p,pax);
-                    const sell=sellRaw!=null?Math.round(sellRaw/gstDiv):null;
-                    const costEntry=productCosts[p.id];
-                    const cost=calcCostTotal(costEntry,pax);
-                    const margin=(sell!=null&&cost!=null)?sell-cost:null;
-                    const marginPct=(margin!=null&&sell>0)?Math.round(margin/sell*100):null;
-                    return{dayId:d.id,dayTitle:d.title,product:p,item,sell,cost,costEntry,margin,marginPct};
-                  })).filter(Boolean);
-                  const hasSell=rows.some(r=>r.sell!=null);
-                  const hasCost=rows.some(r=>r.cost!=null);
-                  const totalSell=hasSell?rows.filter(r=>r.sell!=null).reduce((s,r)=>s+r.sell,0):null;
-                  const totalCost=hasCost?rows.filter(r=>r.cost!=null).reduce((s,r)=>s+r.cost,0):null;
-                  const totalMargin=(totalSell!=null&&totalCost!=null)?totalSell-totalCost:null;
-                  const totalMarginPct=(totalMargin!=null&&totalSell>0)?Math.round(totalMargin/totalSell*100):null;
-                  return(
-                    <div>
-                      <div style={{background:`${C.terra}10`,border:`1px solid ${C.terra}30`,borderRadius:8,padding:"8px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:14}}>🔒</span>
-                        <span style={{fontFamily:F.body,fontSize:11,fontWeight:600,color:C.terra}}>Internal only — never exported to client or agent</span>
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                        <label style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>Guests</label>
-                        <input type="number" min={1} max={20} value={pax} onChange={e=>mutate(it=>({...it,guestCount:parseInt(e.target.value)||2}))} style={{width:56,fontFamily:F.body,fontSize:13,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"4px 8px",textAlign:"center",outline:"none"}}/>
-                        <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Used to estimate per-person and tiered pricing totals</span>
-                        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>Show ex-GST</span>
-                          <div onClick={()=>setShowExGST(v=>!v)} style={{width:32,height:18,borderRadius:9,background:showExGST?C.teal:C.grey200,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
-                            <div style={{position:"absolute",top:3,left:showExGST?14:3,width:12,height:12,borderRadius:"50%",background:C.white,transition:"left 0.2s"}}/>
-                          </div>
-                        </div>
-                      </div>
-                      {rows.length===0?(
-                        <div style={{fontFamily:F.body,fontSize:13,color:C.grey400,textAlign:"center",padding:"30px 0"}}>No items in this itinerary yet.</div>
-                      ):(
-                        <div style={{border:`1px solid ${C.grey200}`,borderRadius:8,overflow:"hidden"}}>
-                          <div style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",background:C.navy,padding:"7px 12px",gap:8}}>
-                            {["Product","Sell (est.)","Your cost","Margin",""].map((h,i)=>(
-                              <div key={i} style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.sand,letterSpacing:"0.08em",textTransform:"uppercase",textAlign:i>0?"right":"left"}}>{h}</div>
-                            ))}
-                          </div>
-                          {active.days.map((d,di)=>{
-                            const dayRows=rows.filter(r=>r.dayId===d.id);
-                            if(!dayRows.length)return null;
-                            return(
-                              <div key={d.id}>
-                                <div style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.grey400,letterSpacing:"0.08em",textTransform:"uppercase",padding:"5px 12px",background:C.grey100,borderTop:`1px solid ${C.grey200}`}}>
-                                  Day {di+1}{d.title?` · ${d.title}`:""}
-                                </div>
-                                {dayRows.map(r=>(
-                                  <div key={r.item.id} style={{borderTop:`1px solid ${C.grey100}`}}>
-                                    <div style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",padding:"8px 12px 4px",gap:8,alignItems:"center"}}>
-                                      <div>
-                                        <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:C.navy}}>{r.item.overrides?.name||r.product.name}</div>
-                                        <div style={{fontFamily:F.body,fontSize:10,color:C.grey400}}>
-                                          {r.product.pricing.structure==="component"?"Component / incl. in package":r.product.pricing.structure==="on_request"?"Price on request":r.sell!=null?`${formatPrice(r.product.pricing)} · ${pax} guests`:"Manual pricing"}
-                                        </div>
-                                      </div>
-                                      <div style={{fontFamily:F.body,fontSize:12,color:C.navy,textAlign:"right"}}>
-                                        {r.item.overrides?.priceDisplay?<span style={{fontStyle:"italic",color:C.grey400}}>{r.item.overrides.priceDisplay}</span>:r.sell!=null?`$${r.sell.toLocaleString()}`:<span style={{color:C.grey400}}>—</span>}
-                                      </div>
-                                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                                        <input type="number" min={0} value={r.costEntry?.amount!=null?r.costEntry.amount:""} onChange={e=>updateProductCost(r.product.id,"amount",e.target.value!=""?parseFloat(e.target.value):null)} placeholder="Enter cost" style={{flex:1,fontFamily:F.body,fontSize:11,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 6px",textAlign:"right",minWidth:0,outline:"none"}}/>
-                                        <select value={r.costEntry?.structure||"flat"} onChange={e=>updateProductCost(r.product.id,"structure",e.target.value)} style={{fontFamily:F.body,fontSize:9,border:`1px solid ${C.grey200}`,borderRadius:4,padding:"3px 3px",color:C.grey600,background:C.white,outline:"none"}}>
-                                          <option value="flat">flat</option>
-                                          <option value="per_person">pp</option>
-                                          <option value="per_couple">p/c</option>
-                                        </select>
-                                      </div>
-                                      <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:r.margin!=null?(r.margin>=0?C.teal:C.terra):C.grey400,textAlign:"right"}}>
-                                        {r.margin!=null?`$${r.margin.toLocaleString()}`:"—"}
-                                      </div>
-                                      <div style={{fontFamily:F.body,fontSize:11,color:r.marginPct!=null?(r.marginPct>=20?C.teal:C.terra):C.grey400,textAlign:"right"}}>
-                                        {r.marginPct!=null?`${r.marginPct}%`:""}
-                                      </div>
-                                    </div>
-                                    <div style={{padding:"0 12px 7px",display:"flex",alignItems:"center",gap:6}}>
-                                      <span style={{fontFamily:F.body,fontSize:9,color:C.grey400,flexShrink:0}}>Cost notes</span>
-                                      <input type="text" value={r.costEntry?.notes||""} onChange={e=>updateProductCost(r.product.id,"notes",e.target.value||null)} placeholder="e.g. $400 guide fee / $200 lunch / $50 diesel" style={{flex:1,fontFamily:F.body,fontSize:10,color:C.grey600,border:"none",borderBottom:`1px dashed ${C.grey200}`,padding:"1px 4px",outline:"none",background:"transparent"}}/>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
-                          <div style={{display:"grid",gridTemplateColumns:"1fr 80px 170px 72px 52px",padding:"10px 12px",gap:8,borderTop:`2px solid ${C.navy}`,background:C.sandLight,alignItems:"center"}}>
-                            <div style={{fontFamily:F.heading,fontSize:12,fontWeight:700,color:C.navy}}>Total estimate</div>
-                            <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:C.navy,textAlign:"right"}}>{totalSell!=null?`$${totalSell.toLocaleString()}`:"—"}</div>
-                            <div style={{fontFamily:F.body,fontSize:12,color:C.grey600,textAlign:"right"}}>{totalCost!=null?`$${totalCost.toLocaleString()}`:"—"}</div>
-                            <div style={{fontFamily:F.heading,fontSize:13,fontWeight:700,color:totalMargin!=null?(totalMargin>=0?C.teal:C.terra):C.grey400,textAlign:"right"}}>{totalMargin!=null?`$${totalMargin.toLocaleString()}`:"—"}</div>
-                            <div style={{fontFamily:F.body,fontSize:12,fontWeight:600,color:totalMarginPct!=null?(totalMarginPct>=20?C.teal:C.terra):C.grey400,textAlign:"right"}}>{totalMarginPct!=null?`${totalMarginPct}%`:"—"}</div>
-                          </div>
-                        </div>
-                      )}
-                      <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:10,lineHeight:1.5}}>
-                        Cost entries save per product and carry across all itineraries. Sell totals are estimated at {pax} guest{pax!==1?"s":""}. Enter costs ex GST. Items with component or on-request pricing show "—" in the sell column — enter the sell value manually in the item override if needed.
-                      </div>
-                    </div>
-                  );
-                })()}
-
-              </div>
-            </div>
-          </div>
-        )
-      )}
-    </div>
-  );
-}
+                  <span>Updated {new Date(it.updatedAt).toLocaleDateString("en-AU")}<
