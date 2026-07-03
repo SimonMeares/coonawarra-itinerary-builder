@@ -439,6 +439,7 @@ input,textarea,select,button{font-family:inherit;}
   .print-break{page-break-before:always;}
   .cover-page{page-break-after:always;}
   .divider-page{page-break-before:always;page-break-after:always;}
+  img{break-inside:avoid;page-break-inside:avoid;}
   @page{margin:0;size:A4;}
   @page:not(:first){margin:12mm;}
   .page-content{padding:12mm;}
@@ -557,26 +558,27 @@ function ImageUploader({productId,images,onImagesChange}){
   );
 }
 
+const IMG_WRAP={breakInside:"avoid",pageBreakInside:"avoid",WebkitColumnBreakInside:"avoid"};
 function ImageStrip({images}){
   if(!images?.length)return null;
   const show=images.slice(0,4);
   if(show.length===1){
-    return<div style={{marginBottom:10,borderRadius:6,overflow:"hidden"}}><img src={show[0]} alt="" style={{width:"100%",height:260,objectFit:"cover",objectPosition:"center center",display:"block"}} crossOrigin="anonymous"/></div>;
+    return<div style={{marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}><img src={show[0]} alt="" style={{width:"100%",height:260,objectFit:"cover",objectPosition:"center center",display:"block"}} crossOrigin="anonymous"/></div>;
   }
   if(show.length===2){
-    return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
+    return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
       {show.map((s,i)=><img key={i} src={s} alt="" style={{width:"100%",height:180,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>)}
     </div>;
   }
   if(show.length===3){
-    return<div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gridTemplateRows:"auto auto",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
+    return<div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gridTemplateRows:"auto auto",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
       <img src={show[0]} alt="" style={{width:"100%",height:180,objectFit:"cover",objectPosition:"center",display:"block",gridRow:"1 / 3"}} crossOrigin="anonymous"/>
       <img src={show[1]} alt="" style={{width:"100%",height:87,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
       <img src={show[2]} alt="" style={{width:"100%",height:87,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>
     </div>;
   }
   // 4 images — 2x2 grid
-  return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden"}}>
+  return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
     {show.map((s,i)=><img key={i} src={s} alt="" style={{width:"100%",height:130,objectFit:"cover",objectPosition:"center",display:"block"}} crossOrigin="anonymous"/>)}
   </div>;
 }
