@@ -506,6 +506,13 @@ input,textarea,select,button{font-family:inherit;}
   @page :first{margin:0;}
   .preview-wrapper{padding:0!important;}
   .exp-card{overflow:visible!important;break-inside:avoid!important;page-break-inside:avoid!important;}
+  .day-hdr{break-after:avoid;page-break-after:avoid;}
+  .day-weather-note{break-after:avoid;page-break-after:avoid;}
+  .day-notes-print{break-after:avoid;page-break-after:avoid;}
+  .weather-widget{display:none!important;}
+  .img-strip{display:flex!important;flex-direction:row!important;height:120px!important;overflow:hidden!important;gap:3px!important;}
+  .img-strip img{flex:1!important;height:120px!important;width:0!important;min-width:0!important;aspect-ratio:unset!important;object-fit:cover!important;object-position:center!important;}
+  .img-strip img:first-child{flex:2!important;}
   .print-page-num::after{content:counter(page);}
   body{counter-reset:page;}
   .print-break{counter-increment:page;}
@@ -627,24 +634,24 @@ function ImageStrip({images}){
   if(!images?.length)return null;
   const show=images.slice(0,4);
   if(show.length===1){
-    return<div style={{marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
+    return<div className="img-strip" style={{marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
       <img src={show[0]} alt="" style={imgFill("16/9")} crossOrigin="anonymous"/>
     </div>;
   }
   if(show.length===2){
-    return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
+    return<div className="img-strip" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
       {show.map((s,i)=><img key={i} src={s} alt="" style={imgFill("3/2")} crossOrigin="anonymous"/>)}
     </div>;
   }
   if(show.length===3){
-    return<div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
+    return<div className="img-strip" style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
       <img src={show[0]} alt="" style={{...imgFill("2/3"),height:"100%",gridRow:"1/3"}} crossOrigin="anonymous"/>
       <img src={show[1]} alt="" style={imgFill("3/2")} crossOrigin="anonymous"/>
       <img src={show[2]} alt="" style={imgFill("3/2")} crossOrigin="anonymous"/>
     </div>;
   }
   // 4 images — 2×2 grid
-  return<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
+  return<div className="img-strip" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginBottom:10,borderRadius:6,overflow:"hidden",...IMG_WRAP}}>
     {show.map((s,i)=><img key={i} src={s} alt="" style={imgFill("4/3")} crossOrigin="anonymous"/>)}
   </div>;
 }
@@ -1283,17 +1290,17 @@ function Preview({itinerary,productImages,showInternal,allProducts,currency,fxRa
         const w=day.date?WEATHER[new Date(day.date).getMonth()+1]:null;
         return(
           <div key={day.id} className={!itinerary.printFlow?"print-break":""} style={{marginBottom:20}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
+            <div className="day-hdr" style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,paddingBottom:8,borderBottom:`2px solid ${C.sand}`}}>
               <span style={{fontFamily:F.body,fontSize:9,fontWeight:700,color:C.terra,letterSpacing:"0.1em",textTransform:"uppercase"}}>DAY {di+1}</span>
               <div style={{flex:1}}>
                 <div style={{fontFamily:F.heading,fontSize:18,fontWeight:700,color:C.navy}}>{day.title}</div>
                 {day.location&&<div style={{fontFamily:F.body,fontSize:11,color:C.grey400,marginTop:1}}>{day.location}</div>}
               </div>
               {day.date&&<span style={{fontFamily:F.body,fontSize:11,color:C.grey400}}>{fmtDateShort(day.date)}</span>}
-              {w&&<div style={{display:"flex",alignItems:"center",gap:4,background:C.grey100,borderRadius:5,padding:"3px 8px"}}><span style={{fontSize:13}}>{w.icon}</span><div><div style={{fontFamily:F.body,fontSize:10,fontWeight:600,color:C.navy}}>{w.month} · {w.temp}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Rainfall: {w.rain}</div></div></div>}
+              {w&&<div className="weather-widget" style={{display:"flex",alignItems:"center",gap:4,background:C.grey100,borderRadius:5,padding:"3px 8px"}}><span style={{fontSize:13}}>{w.icon}</span><div><div style={{fontFamily:F.body,fontSize:10,fontWeight:600,color:C.navy}}>{w.month} · {w.temp}</div><div style={{fontFamily:F.body,fontSize:9,color:C.grey400}}>Rainfall: {w.rain}</div></div></div>}
             </div>
-            {w&&<div style={{fontFamily:F.serif,fontSize:12,fontStyle:"italic",color:C.grey600,marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${C.sand}`}}>{w.note}</div>}
-            {day.dayNotes&&<div style={{fontFamily:F.body,fontSize:12,color:C.grey600,marginBottom:14,padding:"10px 12px",background:C.sandLight,borderRadius:6}}>{day.dayNotes}</div>}
+            {w&&<div className="day-weather-note" style={{fontFamily:F.serif,fontSize:12,fontStyle:"italic",color:C.grey600,marginBottom:12,paddingLeft:10,borderLeft:`2px solid ${C.sand}`}}>{w.note}</div>}
+            {day.dayNotes&&<div className="day-notes-print" style={{fontFamily:F.body,fontSize:12,color:C.grey600,marginBottom:14,padding:"10px 12px",background:C.sandLight,borderRadius:6}}>{day.dayNotes}</div>}
             {day.items.map(item=>{
               const p=findProduct(allProducts,item.productId);
               if(!p)return null;
