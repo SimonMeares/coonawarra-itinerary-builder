@@ -386,6 +386,34 @@ async function uploadToCloudinary(file){
   return data.secure_url.replace("/upload/","/upload/f_auto,q_auto,w_1400/");
 }
 
+// Return a Cloudinary URL at a specific width, stripping any existing transforms
+function cdnSrc(url,w){
+  if(!url||!url.includes("res.cloudinary.com"))return url;
+  const parts=url.split("/upload/");
+  if(parts.length<2)return url;
+  // Strip existing transform segments (contain underscore or comma) then re-insert
+  const cleanPath=parts[1].replace(/^(?:[^/]*[_,][^/]*\/)+/,"");
+  return `${parts[0]}/upload/f_auto,q_auto:best,w_${w}/${cleanPath}`;
+}
+
+// Print with downsized images to reduce PDF file size
+function printCompressed(title){
+  document.title=title;
+  const imgs=Array.from(document.querySelectorAll(".preview-wrapper img"))
+    .filter(img=>img.src&&img.src.includes("res.cloudinary.com"));
+  const origSrcs=imgs.map(img=>img.src);
+  imgs.forEach(img=>{img.src=cdnSrc(img.src,700);});
+  const loads=imgs.map(img=>new Promise(res=>{
+    if(img.complete&&img.naturalWidth)res();
+    else{img.onload=res;img.onerror=res;}
+  }));
+  Promise.all(loads).then(()=>{
+    window.print();
+    // Restore originals after print dialog closes
+    setTimeout(()=>{imgs.forEach((img,i)=>{img.src=origSrcs[i];});},3000);
+  });
+}
+
 // ─── Exchange rates ───────────────────────────────────────────────────────────
 const DEFAULT_FX = {NZD:1.08,GBP:0.51,USD:0.64,SGD:0.87,EUR:0.59};
 const FX_KEY = "ce_fx_rates";
@@ -2104,7 +2132,7 @@ export default function App(){
   useState(()=>{
     function handleKey(e){
       if(e.ctrlKey||e.metaKey){
-        if(e.key==="p"&&active&&bView==="preview"){e.preventDefault();document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}
+        if(e.key==="p"&&active&&bView==="preview"){e.preventDefault();printCompressed(`${active.clientName||"Itinerary"} — ${active.title}`);}
         if(e.key==="d"&&active&&bView==="edit"&&editTab==="itinerary"){e.preventDefault();if(active.days.length>0)duplicateDay(active.days[active.days.length-1].id);}
         if(e.key==="n"){e.preventDefault();createNew();}
       }
@@ -2309,7 +2337,7 @@ export default function App(){
                 <button onClick={()=>setShowFxSettings(v=>!v)} style={{fontFamily:F.body,fontSize:10,color:"rgba(255,255,255,0.5)",background:"transparent",border:"none",padding:"3px 5px"}} title="Edit exchange rates">⚙</button>
               </div>
               <ShareButton itinerary={active} allProducts={allProducts} productImages={productImages} activeCurrency={activeCurrency} fxRates={fxRates}/>
-              <button onClick={()=>{document.title=`${active.clientName||"Itinerary"} — ${active.title}`;window.print();}} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
+              <button onClick={()=>printCompressed(`${active.clientName||"Itinerary"} — ${active.title}`)} style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",color:C.navy,background:C.sand,border:"none",borderRadius:5,padding:"6px 12px"}}>Print / PDF</button>
               <EmailDraftButton itinerary={active} allProducts={allProducts} productImages={productImages} activeCurrency={activeCurrency} fxRates={fxRates}/>
               <button onClick={()=>{
                 const html=generateOfflineHTML(active,allProducts,productImages,activeCurrency,fxRates);
