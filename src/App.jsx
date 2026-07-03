@@ -402,7 +402,7 @@ function printCompressed(title){
   const imgs=Array.from(document.querySelectorAll(".preview-wrapper img"))
     .filter(img=>img.src&&img.src.includes("res.cloudinary.com"));
   const origSrcs=imgs.map(img=>img.src);
-  imgs.forEach(img=>{img.src=cdnSrc(img.src,350);});
+  imgs.forEach(img=>{img.src=cdnSrc(img.src,500);});
   const loads=imgs.map(img=>new Promise(res=>{
     if(img.complete&&img.naturalWidth)res();
     else{img.onload=res;img.onerror=res;}
