@@ -2,20 +2,24 @@
 // Stores and retrieves the product image URL map via Netlify Blobs.
 // The app calls GET on load and POST on every image change.
 
-const { getStore } = require("@netlify/blobs");
+import { getStore } from "@netlify/blobs";
 
 const HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Content-Type": "application/json",
 };
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: HEADERS, body: "" };
   }
 
   try {
-    const store = getStore({ name: "product-images", consistency: "strong" });
+    const store = getStore({
+      name: "product-images",
+      siteID: process.env.NETLIFY_SITE_ID,
+      token: process.env.NETLIFY_DEPLOY_TOKEN,
+    });
 
     if (event.httpMethod === "GET") {
       const data = await store.get("image-map", { type: "json" });
