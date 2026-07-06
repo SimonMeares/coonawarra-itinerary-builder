@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const C = {
   navy:"#192957",sand:"#d8c69d",sandLight:"#f0ead8",sandDark:"#b8a678",
@@ -532,8 +532,11 @@ function loadCP(){try{const r=localStorage.getItem("ce_custom_products_v1");retu
 function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}}
 function loadPC(){try{const r=localStorage.getItem("ce_product_costs_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
 function savePC(v){try{localStorage.setItem("ce_product_costs_v1",JSON.stringify(v));}catch(e){}}
-function loadImgs(){try{const r=localStorage.getItem("ce_product_images_v2");return r?JSON.parse(r):{};}catch(e){return{};}}
-function saveImgs(i){try{localStorage.setItem("ce_product_images_v2",JSON.stringify(i));}catch(e){alert("Failed to save image references.");}}
+const IMGS_KEY="ce_product_images_v2";
+function loadImgsLocal(){try{const r=localStorage.getItem(IMGS_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
+function saveImgsLocal(i){try{localStorage.setItem(IMGS_KEY,JSON.stringify(i));}catch(e){}}
+async function fetchImgsRemote(){try{const r=await fetch("/.netlify/functions/images");if(!r.ok)return null;return await r.json();}catch(e){return null;}}
+async function saveImgsRemote(i){try{await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(i)});}catch(e){console.warn("[images] remote save failed:",e);}}
 function loadLogos(){try{const r=localStorage.getItem("ce_partner_logos_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveLogos(l){try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(l));}catch(e){}}
 function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
@@ -543,14 +546,7 @@ function saveTemplates(t){try{localStorage.setItem("ce_templates_v1",JSON.string
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS=`
-@font-face{font-family:'Cabin';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/cabin-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;}
-@font-face{font-family:'Cabin';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/cabin-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
-@font-face{font-family:'PT Serif';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/pt-serif-normal-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;}
-@font-face{font-family:'PT Serif';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/pt-serif-normal-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
-@font-face{font-family:'PT Serif';font-style:italic;font-weight:400;font-display:swap;src:url('/fonts/pt-serif-italic-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;}
-@font-face{font-family:'PT Serif';font-style:italic;font-weight:400;font-display:swap;src:url('/fonts/pt-serif-italic-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
-@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:300 700;font-display:swap;src:url('/fonts/source-sans-3-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;}
-@font-face{font-family:'Source Sans 3';font-style:normal;font-weight:300 700;font-display:swap;src:url('/fonts/source-sans-3-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@import url('https://fonts.googleapis.com/css2?family=Cabin:wght@400;600;700&family=PT+Serif:ital@0;1&family=Source+Sans+3:wght@300;400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
 body{margin:0;background:#faf9f6;font-family:'Source Sans 3','Open Sans',sans-serif;counter-reset:page-num;}
 input,textarea,select,button{font-family:inherit;}
@@ -2190,7 +2186,7 @@ export default function App(){
   const[showInternal,setSI]=useState(false);
   const[itineraries,setIts]=useState(()=>{const stored=loadIts();const toAdd=buildSamples().filter(s=>!stored.some(it=>it.id===s.id));if(toAdd.length===0)return stored;const merged=[...toAdd,...stored];saveIts(merged);return merged;});
   const[activeId,setActiveId]=useState(null);
-  const[productImages,setPImgs]=useState(()=>loadImgs());
+  const[productImages,setPImgs]=useState(()=>loadImgsLocal());
   const[partnerLogos,setPLogos]=useState(()=>loadLogos());
   const[customProducts,setCPs]=useState(()=>loadCP());
   const[productCosts,setPCosts]=useState(()=>loadPC());
@@ -2221,6 +2217,16 @@ export default function App(){
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
 
+  // Sync image URLs from Netlify Blobs on mount (Blobs is source of truth; localStorage is fast initial load)
+  useEffect(()=>{
+    fetchImgsRemote().then(remote=>{
+      if(remote&&typeof remote==="object"&&Object.keys(remote).length>0){
+        setPImgs(remote);
+        saveImgsLocal(remote);
+      }
+    });
+  },[]);
+
   // Keyboard shortcuts
   useState(()=>{
     function handleKey(e){
@@ -2235,7 +2241,7 @@ export default function App(){
   });
   const active=itineraries.find(i=>i.id===activeId)||null;
 
-  function handleImagesChange(productId,imgs){const next={...productImages,[productId]:imgs};setPImgs(next);saveImgs(next);}
+  function handleImagesChange(productId,imgs){const next={...productImages,[productId]:imgs};setPImgs(next);saveImgsLocal(next);saveImgsRemote(next);}
   function handleLogoChange(productId,url){const next={...partnerLogos,[productId]:url||undefined};if(!url)delete next[productId];setPLogos({...next});saveLogos({...next});}
 
   function handleSaveProduct(product){
