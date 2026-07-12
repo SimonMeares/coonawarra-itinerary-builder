@@ -1840,11 +1840,18 @@ h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957
 <script>
 // Fires once on page load to record the first view for CRM follow-up.
 // The endpoint itself is idempotent server-side, so repeat opens are a no-op.
-fetch("${BUILDER_ORIGIN}/.netlify/functions/itineraries", {
-  method: "POST",
-  headers: {"Content-Type": "application/json"},
-  body: JSON.stringify({id: "${itinerary.id}", action: "view"})
-}).catch(function(){});
+// Uses text/plain (a CORS-safelisted content type) instead of application/json
+// so the cross-origin ping is a simple request and never needs a preflight —
+// itineraries.js parses the body as JSON regardless of the declared type.
+(function(){
+  var url = "${BUILDER_ORIGIN}/.netlify/functions/itineraries";
+  var payload = JSON.stringify({id: "${itinerary.id}", action: "view"});
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url, new Blob([payload], {type: "text/plain"}));
+  } else {
+    fetch(url, {method: "POST", headers: {"Content-Type": "text/plain"}, body: payload}).catch(function(){});
+  }
+})();
 </script>
 </body></html>`;
 }
@@ -1952,7 +1959,10 @@ async function deployToNetlify(itinerary, allProducts, productImages, activeCurr
   const result = await res.json();
   if (result.error) throw new Error(result.error);
 
-  const liveUrl = result.path ? `${NETLIFY_LIVE_URL}${result.path}` : NETLIFY_LIVE_URL;
+  // Share the clean directory URL (Netlify serves index.html for it implicitly)
+  // rather than the literal file path used internally for the deploy manifest.
+  const dirPath = result.path ? result.path.replace(/index\.html$/, "") : "";
+  const liveUrl = dirPath ? `${NETLIFY_LIVE_URL}${dirPath}` : NETLIFY_LIVE_URL;
   await saveItineraryMetadata(itinerary, liveUrl);
   return liveUrl;
 }
