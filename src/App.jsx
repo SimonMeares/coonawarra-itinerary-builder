@@ -1836,7 +1836,17 @@ h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957
 .footer-contacts b{color:#d8c69d;}
 @media(max-width:600px){.cover-meta,.footer-contacts{flex-direction:column;gap:8px;}.inc-list{columns:1;}}
 @media print{body{max-width:none;padding:0;}.page-break{page-break-before:always;}@page{margin:12mm;}}
-</style></head><body>${body}</body></html>`;
+</style></head><body>${body}
+<script>
+// Fires once on page load to record the first view for CRM follow-up.
+// The endpoint itself is idempotent server-side, so repeat opens are a no-op.
+fetch("${BUILDER_ORIGIN}/.netlify/functions/itineraries", {
+  method: "POST",
+  headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({id: "${itinerary.id}", action: "view"})
+}).catch(function(){});
+</script>
+</body></html>`;
 }
 
 // ─── Export CSV ───────────────────────────────────────────────────────────────
@@ -1881,10 +1891,46 @@ function exportToCSV(itineraries, allProducts) {
 // Token is stored server-side as NETLIFY_DEPLOY_TOKEN environment variable.
 // The browser calls /.netlify/functions/deploy which proxies to the Netlify API.
 const NETLIFY_LIVE_URL = "https://ce-limestonecoast.netlify.app";
+// Absolute origin for the generated static HTML's view-tracking ping, since that
+// page is hosted on ce-limestonecoast.netlify.app, a different origin from here.
+const BUILDER_ORIGIN = "https://coonawarra-itinerary-builder.netlify.app";
 
 async function sha1(str) {
   const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// The subset of an itinerary that the CRM needs, synced to Netlify Blobs on every
+// share-link deploy so it's queryable from outside the browser (Phase 3 dashboard).
+function crmMetadata(itinerary, liveUrl) {
+  return {
+    id: itinerary.id,
+    ceRef: itinerary.ceRef,
+    rezdyRef: itinerary.rezdyRef,
+    title: itinerary.title,
+    agentName: itinerary.agentName,
+    agentRef: itinerary.agentRef,
+    clientName: itinerary.clientName,
+    clientEmail: itinerary.clientEmail,
+    status: itinerary.status,
+    statusHistory: itinerary.statusHistory || [],
+    createdAt: itinerary.createdAt,
+    updatedAt: itinerary.updatedAt,
+    liveUrl,
+  };
+}
+
+async function saveItineraryMetadata(itinerary, liveUrl) {
+  try {
+    await fetch("/.netlify/functions/itineraries", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(crmMetadata(itinerary, liveUrl)),
+    });
+  } catch (e) {
+    // Non-fatal — the share link itself already deployed successfully.
+    console.error("[itineraries] metadata sync failed:", e);
+  }
 }
 
 async function deployToNetlify(itinerary, allProducts, productImages, activeCurrency, fxRates) {
@@ -1895,7 +1941,7 @@ async function deployToNetlify(itinerary, allProducts, productImages, activeCurr
   const res = await fetch("/.netlify/functions/deploy", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({html, fileHash}),
+    body: JSON.stringify({html, fileHash, itineraryId: itinerary.id}),
   });
 
   if (!res.ok) {
@@ -1905,7 +1951,10 @@ async function deployToNetlify(itinerary, allProducts, productImages, activeCurr
 
   const result = await res.json();
   if (result.error) throw new Error(result.error);
-  return NETLIFY_LIVE_URL;
+
+  const liveUrl = result.path ? `${NETLIFY_LIVE_URL}${result.path}` : NETLIFY_LIVE_URL;
+  await saveItineraryMetadata(itinerary, liveUrl);
+  return liveUrl;
 }
 
 // ─── Share button component ────────────────────────────────────────────────────
@@ -1938,7 +1987,7 @@ function ShareButton({itinerary, allProducts, productImages, activeCurrency, fxR
     <div style={{display:"flex",alignItems:"center",gap:4}}>
       <div style={{display:"flex",flexDirection:"column",gap:1}}>
         <div style={{fontFamily:F.body,fontSize:10,color:C.white,background:"rgba(255,255,255,0.15)",borderRadius:5,padding:"4px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-          ce-limestonecoast.netlify.app
+          {liveUrl.replace("https://","")}
         </div>
         <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.45)",paddingLeft:2}}>
           Live: {itinerary.ceRef||"—"}{itinerary.clientName?` · ${itinerary.clientName}`:""}
