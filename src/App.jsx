@@ -2885,9 +2885,14 @@ export default function App(){
                   <input value={active.origin} onChange={e=>mutate(it=>({...it,origin:e.target.value}))} placeholder="Origin" style={{...fi,width:110}}/>
                   <select value={active.status} onChange={e=>{
                     const newStatus=e.target.value;
-                    mutate(it=>({...it,status:newStatus,
-                      statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
-                    }));
+                    const updated={...active,status:newStatus,
+                      statusHistory:[...(active.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
+                    };
+                    mutate(()=>updated);
+                    // Status changes are local-only otherwise — sync so the server can detect
+                    // the transition (e.g. for the Notion Follow-Up Task hook). liveUrl omitted:
+                    // the server merges this with whatever's already stored for this itinerary.
+                    saveItineraryMetadata(updated, undefined);
                   }} style={{...fi,color:SC[active.status],fontWeight:600}}>
                     <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
                   </select>
