@@ -82,9 +82,10 @@ async function createFollowUpTask(notion, { task, category, contactPageId, note,
 }
 
 // Trade itineraries only — guest-direct itineraries (no agentName) are skipped entirely.
+// crmSync===false is an explicit per-itinerary opt-out (defaults to on/undefined).
 // Never throws: a Notion outage or bad token must not block the Blobs write.
 async function syncFollowUpTask(itinerary, { category, taskLabel }) {
-  if (!itinerary.agentName) return;
+  if (!itinerary.agentName || itinerary.crmSync === false) return;
   const notion = notionClient();
   if (!notion) return;
   try {

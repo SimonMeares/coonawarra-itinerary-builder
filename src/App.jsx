@@ -1924,6 +1924,7 @@ function crmMetadata(itinerary, liveUrl) {
     createdAt: itinerary.createdAt,
     updatedAt: itinerary.updatedAt,
     liveUrl,
+    crmSync: itinerary.crmSync,
   };
 }
 
@@ -3033,6 +3034,17 @@ export default function App(){
                           ):(
                             <AgentLogoUploader onUpload={url=>mutate(it=>({...it,agentLogo:url}))}/>
                           )}
+                        </div>
+                        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.grey200}`,display:"flex",alignItems:"flex-start",gap:8}}>
+                          <input type="checkbox" checked={active.crmSync!==false} onChange={e=>{
+                            const updated={...active,crmSync:e.target.checked};
+                            mutate(()=>updated);
+                            saveItineraryMetadata(updated, undefined);
+                          }} style={{marginTop:2}}/>
+                          <div>
+                            <label style={{fontFamily:F.body,fontSize:11,fontWeight:700,color:C.text,display:"block"}}>Sync to CRM (Notion Follow-Up Tasks)</label>
+                            <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:2}}>Untick to keep this itinerary silent in Notion, even with an agent name set — no task is created when it's viewed or its status changes.</div>
+                          </div>
                         </div>
                       </SectionBox>
                     )}
