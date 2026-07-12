@@ -37,15 +37,23 @@ function addBusinessDays(from, days) {
 }
 
 // Only links the Contact relation on an unambiguous single match — never guesses.
+// Notion's rich_text filter is case-sensitive, so this pre-filters broadly with
+// "contains" and then compares trimmed/lowercased values client-side.
 async function findTradeContact(notion, company) {
   if (!company) return null;
+  const normalized = company.trim().toLowerCase();
+  if (!normalized) return null;
   try {
     const res = await notion.dataSources.query({
       data_source_id: TRADE_CRM_DATA_SOURCE_ID,
-      filter: { property: "Company", rich_text: { equals: company } },
-      page_size: 2,
+      filter: { property: "Company", rich_text: { contains: company.trim() } },
+      page_size: 10,
     });
-    return res.results.length === 1 ? res.results[0].id : null;
+    const matches = res.results.filter((page) => {
+      const value = (page.properties?.Company?.rich_text || []).map((t) => t.plain_text).join("");
+      return value.trim().toLowerCase() === normalized;
+    });
+    return matches.length === 1 ? matches[0].id : null;
   } catch (e) {
     console.error("[itineraries] Notion contact lookup failed:", e);
     return null;
