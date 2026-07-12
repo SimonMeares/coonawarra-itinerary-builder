@@ -1924,6 +1924,7 @@ function crmMetadata(itinerary, liveUrl) {
     createdAt: itinerary.createdAt,
     updatedAt: itinerary.updatedAt,
     liveUrl,
+    crmSync: itinerary.crmSync,
   };
 }
 
@@ -2885,9 +2886,14 @@ export default function App(){
                   <input value={active.origin} onChange={e=>mutate(it=>({...it,origin:e.target.value}))} placeholder="Origin" style={{...fi,width:110}}/>
                   <select value={active.status} onChange={e=>{
                     const newStatus=e.target.value;
-                    mutate(it=>({...it,status:newStatus,
-                      statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
-                    }));
+                    const updated={...active,status:newStatus,
+                      statusHistory:[...(active.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
+                    };
+                    mutate(()=>updated);
+                    // Status changes are local-only otherwise — sync so the server can detect
+                    // the transition (e.g. for the Notion Follow-Up Task hook). liveUrl omitted:
+                    // the server merges this with whatever's already stored for this itinerary.
+                    saveItineraryMetadata(updated, undefined);
                   }} style={{...fi,color:SC[active.status],fontWeight:600}}>
                     <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
                   </select>
@@ -3028,6 +3034,17 @@ export default function App(){
                           ):(
                             <AgentLogoUploader onUpload={url=>mutate(it=>({...it,agentLogo:url}))}/>
                           )}
+                        </div>
+                        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.grey200}`,display:"flex",alignItems:"flex-start",gap:8}}>
+                          <input type="checkbox" checked={active.crmSync!==false} onChange={e=>{
+                            const updated={...active,crmSync:e.target.checked};
+                            mutate(()=>updated);
+                            saveItineraryMetadata(updated, undefined);
+                          }} style={{marginTop:2}}/>
+                          <div>
+                            <label style={{fontFamily:F.body,fontSize:11,fontWeight:700,color:C.text,display:"block"}}>Sync to CRM (Notion Follow-Up Tasks)</label>
+                            <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:2}}>Untick to keep this itinerary silent in Notion, even with an agent name set — no task is created when it's viewed or its status changes.</div>
+                          </div>
                         </div>
                       </SectionBox>
                     )}
