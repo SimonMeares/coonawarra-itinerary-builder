@@ -30,9 +30,10 @@ import { requireAuth, corsHeaders } from "./_lib/auth.js";
 
 const ID_PATTERN = /^c_[a-z0-9]+$/i;
 
-// CE Follow-Up Tasks and CE Trade CRM data source IDs (Notion's multi-source database model).
+// CE Follow-Up Tasks, CE Trade CRM and CE Companies data source IDs (Notion's multi-source database model).
 const FOLLOWUP_TASKS_DATA_SOURCE_ID = "f9336682-821d-471e-8a42-b1aae7592783";
 const TRADE_CRM_DATA_SOURCE_ID = "e97769c1-f2d3-41fb-9100-813d4d50fb15";
+const COMPANIES_DATA_SOURCE_ID = "24050576-1a17-4f72-abca-efbb56fd9c63";
 
 function notionClient() {
   if (!process.env.NOTION_API_KEY) return null;
@@ -50,26 +51,54 @@ function addBusinessDays(from, days) {
   return d.toISOString().slice(0, 10);
 }
 
-// Only links the Contact relation on an unambiguous single match — never guesses.
-// Notion's rich_text filter is case-sensitive, so this pre-filters broadly with
-// "contains" and then compares trimmed/lowercased values client-side.
-async function findTradeContact(notion, company) {
-  if (!company) return null;
-  const normalized = company.trim().toLowerCase();
+// Resolves agentName to a CE Trade CRM contact via CE Companies - the real
+// canonical parent layer - rather than matching CE Trade CRM's free-text
+// "Company" field directly (the original stopgap, before CE Companies
+// existed). Two steps, each with its own unambiguous-match-only discipline:
+//
+//   1. Find the CE Companies record whose Company Name exactly matches
+//      agentName (case/whitespace-normalized). Zero or multiple matches ->
+//      unlinked. Notion's title filter is case-sensitive, so this
+//      pre-filters broadly with "contains" and compares normalized values
+//      client-side, same technique the old version used.
+//   2. Follow that company's Contacts relation. One linked contact -> use
+//      it. Zero -> unlinked (company exists but has no contact yet). More
+//      than one -> only link if exactly one of them is marked Primary
+//      Contact - a real ambiguous case (e.g. a company with several trade
+//      contacts and no primary set) stays unlinked rather than guessing.
+async function findTradeContact(notion, agentName) {
+  if (!agentName) return null;
+  const normalized = agentName.trim().toLowerCase();
   if (!normalized) return null;
   try {
-    const res = await notion.dataSources.query({
-      data_source_id: TRADE_CRM_DATA_SOURCE_ID,
-      filter: { property: "Company", rich_text: { contains: company.trim() } },
+    const companyRes = await notion.dataSources.query({
+      data_source_id: COMPANIES_DATA_SOURCE_ID,
+      filter: { property: "Company Name", title: { contains: agentName.trim() } },
       page_size: 10,
     });
-    const matches = res.results.filter((page) => {
-      const value = (page.properties?.Company?.rich_text || []).map((t) => t.plain_text).join("");
+    const companyMatches = companyRes.results.filter((page) => {
+      const value = (page.properties?.["Company Name"]?.title || []).map((t) => t.plain_text).join("");
       return value.trim().toLowerCase() === normalized;
     });
-    return matches.length === 1 ? matches[0].id : null;
+    if (companyMatches.length !== 1) return null;
+
+    const contactIds = (companyMatches[0].properties?.Contacts?.relation || []).map((r) => r.id);
+    if (contactIds.length === 0) return null;
+    if (contactIds.length === 1) return contactIds[0];
+
+    const primaryRes = await notion.dataSources.query({
+      data_source_id: TRADE_CRM_DATA_SOURCE_ID,
+      filter: {
+        and: [
+          { property: "Company Record", relation: { contains: companyMatches[0].id } },
+          { property: "Primary Contact", checkbox: { equals: true } },
+        ],
+      },
+      page_size: 2,
+    });
+    return primaryRes.results.length === 1 ? primaryRes.results[0].id : null;
   } catch (e) {
-    console.error("[itineraries] Notion contact lookup failed:", e);
+    console.error("[itineraries] Notion company/contact lookup failed:", e);
     return null;
   }
 }
