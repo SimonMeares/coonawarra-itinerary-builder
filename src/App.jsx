@@ -1979,6 +1979,22 @@ function ShareButton({itinerary, allProducts, productImages, activeCurrency, fxR
   const [liveUrl, setLiveUrl] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // Sample/demo itineraries (id starts with "sample_", not the "c_..." ids
+  // uid() gives real ones) are reference content, not meant to be published
+  // as a live shared link - deploy.js's id-format check has always rejected
+  // them anyway, this just fails clearly up front instead of a confusing
+  // "Invalid itineraryId" after clicking Share.
+  if (!/^c_/.test(itinerary.id)) {
+    return (
+      <button disabled title="Sample itineraries can't be shared directly — click + New to create your own itinerary first"
+        style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",
+          color:"rgba(255,255,255,0.4)",background:"rgba(255,255,255,0.08)",border:"none",borderRadius:5,padding:"6px 12px",cursor:"not-allowed"}}
+      >
+        🔗 Share link
+      </button>
+    );
+  }
+
   async function handleDeploy() {
     setState("deploying");
     try {
