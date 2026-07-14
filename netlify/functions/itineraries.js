@@ -103,6 +103,11 @@ async function findTradeContact(notion, agentName) {
   }
 }
 
+// Returns { ok: true, taskId } or { ok: false, error }. The caller decides
+// whether to surface this - never let a Notion failure block the itinerary
+// itself from saving, but don't just swallow it into a server log either
+// (this whole flow used to do exactly that, which made a real Notion
+// permission gap indistinguishable from "nothing to sync" from the outside).
 async function createFollowUpTask(notion, { task, category, contactPageId, note, dueDate }) {
   try {
     const properties = {
@@ -115,22 +120,28 @@ async function createFollowUpTask(notion, { task, category, contactPageId, note,
     if (contactPageId) {
       properties.Contact = { relation: [{ id: contactPageId }] };
     }
-    await notion.pages.create({
+    const page = await notion.pages.create({
       parent: { type: "data_source_id", data_source_id: FOLLOWUP_TASKS_DATA_SOURCE_ID },
       properties,
     });
+    return { ok: true, taskId: page.id };
   } catch (e) {
     console.error("[itineraries] Notion task creation failed:", e);
+    return { ok: false, error: e.message };
   }
 }
 
 // Trade itineraries only — guest-direct itineraries (no agentName) are skipped entirely.
 // crmSync===false is an explicit per-itinerary opt-out (defaults to on/undefined).
 // Never throws: a Notion outage or bad token must not block the Blobs write.
+// Returns a small result object describing what happened, so the caller can
+// surface it in the response body rather than only a server log neither of
+// us can read after the fact.
 async function syncFollowUpTask(itinerary, { category, taskLabel }) {
-  if (!itinerary.agentName || itinerary.crmSync === false) return;
+  if (!itinerary.agentName) return { ok: false, error: "no agentName - guest itinerary, skipped" };
+  if (itinerary.crmSync === false) return { ok: false, error: "crmSync explicitly disabled for this itinerary" };
   const notion = notionClient();
-  if (!notion) return;
+  if (!notion) return { ok: false, error: "NOTION_API_KEY not set" };
   try {
     const contactPageId = await findTradeContact(notion, itinerary.agentName);
     const note = [
@@ -138,15 +149,17 @@ async function syncFollowUpTask(itinerary, { category, taskLabel }) {
       itinerary.ceRef ? `CE ref: ${itinerary.ceRef}` : null,
       itinerary.liveUrl || null,
     ].filter(Boolean).join(" · ");
-    await createFollowUpTask(notion, {
+    const result = await createFollowUpTask(notion, {
       task: `${itinerary.agentName} — ${taskLabel}: ${itinerary.title || "Itinerary"}`,
       category,
       contactPageId,
       note,
       dueDate: addBusinessDays(new Date(), 5),
     });
+    return { ...result, contactLinked: !!contactPageId };
   } catch (e) {
     console.error("[itineraries] Notion sync failed:", e);
+    return { ok: false, error: e.message };
   }
 }
 
@@ -205,6 +218,7 @@ export const handler = async (event) => {
           return { statusCode: 404, headers: HEADERS, body: JSON.stringify({ error: "Not found" }) };
         }
         const alreadyViewed = (existing.statusHistory || []).some((h) => h.status === "viewed");
+        let syncResult = alreadyViewed ? { ok: false, error: "already viewed - not re-synced" } : undefined;
         if (!alreadyViewed) {
           const updated = {
             ...existing,
@@ -214,9 +228,11 @@ export const handler = async (event) => {
             ],
           };
           await store.setJSON(id, updated);
-          await syncFollowUpTask(updated, { category: "Quote Pending", taskLabel: "itinerary viewed" });
+          syncResult = await syncFollowUpTask(updated, { category: "Quote Pending", taskLabel: "itinerary viewed" });
         }
-        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+        // syncResult is included so a Notion sync failure is visible in the
+        // response itself, not just a server log - see syncFollowUpTask.
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, syncResult }) };
       }
 
       // Every other POST (saving/updating the full record) requires a
@@ -227,8 +243,9 @@ export const handler = async (event) => {
       const existing = await store.get(id, { type: "json" });
       const statusChanged = existing && existing.status !== body.status;
       const isTrackedTransition = body.status === "review" || body.status === "published";
+      let syncResult;
       if (statusChanged && isTrackedTransition) {
-        await syncFollowUpTask(body, {
+        syncResult = await syncFollowUpTask(body, {
           category: "General Check-in",
           taskLabel: body.status === "published" ? "itinerary published" : "itinerary in review",
         });
@@ -237,7 +254,7 @@ export const handler = async (event) => {
       // Merge rather than overwrite — callers (e.g. a status-only update) may not know
       // every field already stored, such as liveUrl from a previous deploy.
       await store.setJSON(id, { ...(existing || {}), ...body });
-      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
+      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, syncResult }) };
     }
 
     return {
