@@ -10,6 +10,7 @@
   "dependencies": {
     "@netlify/blobs": "^8.0.0",
     "@notionhq/client": "^5.23.0",
+    "google-auth-library": "^10.9.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

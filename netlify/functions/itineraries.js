@@ -3,18 +3,32 @@
 // keyed by itinerary id, so it's queryable from outside the browser. For trade itineraries
 // (agentName present), also syncs CRM events into the CE Follow-Up Tasks Notion database.
 //
-// GET  ?id=c_xxx                — returns the stored record
-// POST { id, ...fields }        — saves/updates the full record (merged with what's stored)
+// GET  ?id=c_xxx                — returns the stored record. Requires a session - only
+//                                  the builder app reads this today.
+// POST { id, ...fields }        — saves/updates the full record (merged with what's
+//                                  stored). Requires a session - only the builder app
+//                                  writes full records.
 // POST { id, action: "view" }   — idempotent: appends a single "viewed" statusHistory
-//                                  entry the first time a shared link is opened
+//                                  entry the first time a shared link is opened. Stays
+//                                  UNAUTHENTICATED on purpose - this is called from the
+//                                  publicly shared itinerary HTML page itself (see
+//                                  generateOfflineHTML() in src/App.jsx), fired by
+//                                  whichever guest or trade contact opens their link, who
+//                                  was never meant to log in at all. It's narrow by
+//                                  design: it can only append a timestamp to an id that
+//                                  already exists, never create a record or set arbitrary
+//                                  fields, and now validates the id shape below.
+//
+// Previously GET and the full-record POST had no auth check at all - anyone with an
+// itinerary id (inherently "known" since it's in a shareable link) could read the full
+// CRM record, or overwrite it with arbitrary fields, including spoofing a status change
+// that writes a real Follow-Up Task into the live Notion CRM.
 
 import { getStore } from "@netlify/blobs";
 import { Client } from "@notionhq/client";
+import { requireAuth, corsHeaders } from "./_lib/auth.js";
 
-const HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Content-Type": "application/json",
-};
+const ID_PATTERN = /^c_[a-z0-9]+$/i;
 
 // CE Follow-Up Tasks and CE Trade CRM data source IDs (Notion's multi-source database model).
 const FOLLOWUP_TASKS_DATA_SOURCE_ID = "f9336682-821d-471e-8a42-b1aae7592783";
@@ -108,8 +122,19 @@ async function syncFollowUpTask(itinerary, { category, taskLabel }) {
 }
 
 export const handler = async (event) => {
+  const HEADERS = { "Content-Type": "application/json", ...corsHeaders(event) };
+
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: HEADERS, body: "" };
+  }
+
+  // The view-tracking POST below is the one deliberately public path - every
+  // other request needs a session. Checked here (before touching the body)
+  // for GET; the POST case is decided per-action further down, since we
+  // need to see body.action first.
+  if (event.httpMethod === "GET") {
+    const auth = requireAuth(event);
+    if (!auth.ok) return auth.response;
   }
 
   try {
@@ -139,6 +164,13 @@ export const handler = async (event) => {
       }
 
       if (body.action === "view") {
+        // Deliberately unauthenticated - see the file-level comment. Kept as
+        // narrow as possible: the id must look like a real itinerary id, and
+        // this can only append a "viewed" entry to a record that already
+        // exists - it cannot create a record or touch any other field.
+        if (!ID_PATTERN.test(id)) {
+          return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: "Invalid id" }) };
+        }
         const existing = await store.get(id, { type: "json" });
         if (!existing) {
           return { statusCode: 404, headers: HEADERS, body: JSON.stringify({ error: "Not found" }) };
@@ -157,6 +189,11 @@ export const handler = async (event) => {
         }
         return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true }) };
       }
+
+      // Every other POST (saving/updating the full record) requires a
+      // session - only the builder app does this.
+      const auth = requireAuth(event);
+      if (!auth.ok) return auth.response;
 
       const existing = await store.get(id, { type: "json" });
       const statusChanged = existing && existing.status !== body.status;

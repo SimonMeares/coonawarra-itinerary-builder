@@ -7,17 +7,20 @@
 // deploy first fetches the current file list and merges the new/changed path in,
 // rather than sending a single-file manifest that would wipe out every other
 // previously shared itinerary.
+//
+// Only the builder app itself ever calls this (publishing a share link) -
+// nothing public depends on it being open - so it requires a valid session.
+// Previously had no auth check at all: anyone who found this URL could
+// publish arbitrary HTML to any /i/{id}/ path, including overwriting an
+// existing real itinerary's live shared link.
+
+import { requireAuth, corsHeaders } from "./_lib/auth.js";
 
 const SITE_ID = "3278b6b0-6266-4941-b15e-8dc50f6dd5e3";
 const ID_PATTERN = /^c_[a-z0-9]+$/i;
 
-exports.handler = async (event) => {
-  const headers = {
-    "Access-Control-Allow-Origin": "https://coonawarra-itinerary-builder.netlify.app",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Content-Type": "application/json",
-  };
+export const handler = async (event) => {
+  const headers = { "Content-Type": "application/json", ...corsHeaders(event) };
 
   // Handle preflight
   if (event.httpMethod === "OPTIONS") {
@@ -27,6 +30,9 @@ exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
   }
+
+  const auth = requireAuth(event);
+  if (!auth.ok) return auth.response;
 
   const token = process.env.NETLIFY_DEPLOY_TOKEN;
   if (!token) {

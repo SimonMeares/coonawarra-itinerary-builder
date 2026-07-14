@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import Login from "./Login.jsx";
+import { getSession, setSession, clearSession, isSessionValid, authHeader } from "./auth";
 
 const C = {
   navy:"#192957",sand:"#d8c69d",sandLight:"#f0ead8",sandDark:"#b8a678",
@@ -535,8 +537,8 @@ function savePC(v){try{localStorage.setItem("ce_product_costs_v1",JSON.stringify
 const IMGS_KEY="ce_product_images_v2";
 function loadImgsLocal(){try{const r=localStorage.getItem(IMGS_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveImgsLocal(i){try{localStorage.setItem(IMGS_KEY,JSON.stringify(i));}catch(e){}}
-async function fetchImgsRemote(){try{const r=await fetch("/.netlify/functions/images");if(!r.ok)return null;return await r.json();}catch(e){return null;}}
-async function saveImgsRemote(i){try{await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(i)});}catch(e){console.warn("[images] remote save failed:",e);}}
+async function fetchImgsRemote(){try{const r=await fetch("/.netlify/functions/images",{headers:{...authHeader()}});if(r.status===401){window.dispatchEvent(new Event("ce-itin-unauthorized"));return null;}if(!r.ok)return null;return await r.json();}catch(e){return null;}}
+async function saveImgsRemote(i){try{const r=await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json",...authHeader()},body:JSON.stringify(i)});if(r.status===401)window.dispatchEvent(new Event("ce-itin-unauthorized"));}catch(e){console.warn("[images] remote save failed:",e);}}
 function loadLogos(){try{const r=localStorage.getItem("ce_partner_logos_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveLogos(l){try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(l));}catch(e){}}
 function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
@@ -1930,11 +1932,12 @@ function crmMetadata(itinerary, liveUrl) {
 
 async function saveItineraryMetadata(itinerary, liveUrl) {
   try {
-    await fetch("/.netlify/functions/itineraries", {
+    const res = await fetch("/.netlify/functions/itineraries", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", ...authHeader()},
       body: JSON.stringify(crmMetadata(itinerary, liveUrl)),
     });
+    if (res.status === 401) window.dispatchEvent(new Event("ce-itin-unauthorized"));
   } catch (e) {
     // Non-fatal — the share link itself already deployed successfully.
     console.error("[itineraries] metadata sync failed:", e);
@@ -1948,9 +1951,11 @@ async function deployToNetlify(itinerary, allProducts, productImages, activeCurr
   // Call our serverless function — token never touches the browser
   const res = await fetch("/.netlify/functions/deploy", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: {"Content-Type": "application/json", ...authHeader()},
     body: JSON.stringify({html, fileHash, itineraryId: itinerary.id}),
   });
+
+  if (res.status === 401) window.dispatchEvent(new Event("ce-itin-unauthorized"));
 
   if (!res.ok) {
     const err = await res.json().catch(()=>({}));
@@ -2239,7 +2244,7 @@ const EDIT_TABS=[
 ];
 
 // ─── App ──────────────────────────────────────────────────────────────────────
-export default function App(){
+function BuilderApp(){
   const[tab,setTab]=useState("builder");
   const[bView,setBView]=useState("edit");
   const[editTab,setEditTab]=useState("itinerary");
@@ -3107,5 +3112,40 @@ export default function App(){
       )}
 
     </div>
+  );
+}
+
+// ─── Auth gate ──────────────────────────────────────────────────────────────
+// Restricted to a single whitelisted Google account - see
+// netlify/functions/_lib/auth.js and auth-login.js. Wraps BuilderApp rather
+// than touching its internals: unauthenticated visitors get Login instead,
+// signed-in visitors get the full app plus a small sign-out control.
+// A gated fetch call (images.js, itineraries.js full-record save, deploy.js)
+// dispatches "ce-itin-unauthorized" on a 401 so this drops back to Login
+// without waiting for a page reload - same pattern as the CRM dashboard.
+export default function App(){
+  const[session,setSessionState]=useState(()=>isSessionValid()?getSession():null);
+
+  useEffect(()=>{
+    function handleUnauthorized(){clearSession();setSessionState(null);}
+    window.addEventListener("ce-itin-unauthorized",handleUnauthorized);
+    return()=>window.removeEventListener("ce-itin-unauthorized",handleUnauthorized);
+  },[]);
+
+  if(!session){
+    return <Login onSignedIn={()=>setSessionState(getSession())}/>;
+  }
+
+  return(
+    <>
+      <BuilderApp/>
+      <button
+        onClick={()=>{clearSession();setSessionState(null);}}
+        title="Sign out"
+        style={{position:"fixed",bottom:10,right:10,zIndex:9999,fontFamily:"'Source Sans 3','Source Sans Pro','Open Sans',sans-serif",fontSize:11,color:"#5c5a54",background:"#f0ead8",border:"1px solid #e8e6e0",borderRadius:6,padding:"5px 10px",cursor:"pointer",opacity:0.85}}
+      >
+        Sign out
+      </button>
+    </>
   );
 }

@@ -1,18 +1,21 @@
 // netlify/functions/images.js
 // Stores and retrieves the product image URL map via Netlify Blobs.
-// The app calls GET on load and POST on every image change.
+// The app calls GET on load and POST on every image change. Only the
+// builder app itself ever calls this - nothing public depends on it being
+// open - so both GET and POST require a valid session.
 
 import { getStore } from "@netlify/blobs";
-
-const HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Content-Type": "application/json",
-};
+import { requireAuth, corsHeaders } from "./_lib/auth.js";
 
 export const handler = async (event) => {
+  const HEADERS = { "Content-Type": "application/json", ...corsHeaders(event) };
+
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: HEADERS, body: "" };
   }
+
+  const auth = requireAuth(event);
+  if (!auth.ok) return auth.response;
 
   try {
     const store = getStore({
