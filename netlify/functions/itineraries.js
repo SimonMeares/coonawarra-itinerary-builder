@@ -241,6 +241,26 @@ export const handler = async (event) => {
       if (!auth.ok) return auth.response;
 
       const existing = await store.get(id, { type: "json" });
+
+      // The editor auto-saves frequently and fires a network request on
+      // each one - nothing guarantees those requests arrive in the order
+      // they were sent. Without this guard, a late-arriving request from an
+      // *earlier* save (carrying whatever was on the form at that moment,
+      // e.g. a field the guest hadn't filled in yet) can land after a more
+      // recent one and silently overwrite good data with stale/blank
+      // values - this is exactly how agentName has been going missing.
+      // updatedAt is refreshed on every local edit (see mutate() in
+      // App.jsx) and sent with every sync, so it's a reliable ordering key:
+      // if this request is older than what's already stored, a newer save
+      // has already landed - drop this one rather than clobber it.
+      if (existing?.updatedAt && body.updatedAt && new Date(body.updatedAt) < new Date(existing.updatedAt)) {
+        return {
+          statusCode: 200,
+          headers: HEADERS,
+          body: JSON.stringify({ ok: true, skipped: "stale write - a more recent save is already stored" }),
+        };
+      }
+
       const statusChanged = existing && existing.status !== body.status;
       const isTrackedTransition = body.status === "review" || body.status === "published";
       let syncResult;
