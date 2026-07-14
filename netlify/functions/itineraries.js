@@ -66,10 +66,14 @@ function addBusinessDays(from, days) {
 //      than one -> only link if exactly one of them is marked Primary
 //      Contact - a real ambiguous case (e.g. a company with several trade
 //      contacts and no primary set) stays unlinked rather than guessing.
+// Returns { contactId, debug } rather than just an id-or-null - debug
+// explains *why* nothing linked, surfaced up into the API response (see
+// syncFollowUpTask/handler) so that's diagnosable without server logs,
+// same reasoning as syncResult below.
 async function findTradeContact(notion, agentName) {
-  if (!agentName) return null;
+  if (!agentName) return { contactId: null, debug: "no agentName" };
   const normalized = agentName.trim().toLowerCase();
-  if (!normalized) return null;
+  if (!normalized) return { contactId: null, debug: "blank agentName" };
   try {
     const companyRes = await notion.dataSources.query({
       data_source_id: COMPANIES_DATA_SOURCE_ID,
@@ -80,11 +84,13 @@ async function findTradeContact(notion, agentName) {
       const value = (page.properties?.["Company Name"]?.title || []).map((t) => t.plain_text).join("");
       return value.trim().toLowerCase() === normalized;
     });
-    if (companyMatches.length !== 1) return null;
+    if (companyMatches.length !== 1) {
+      return { contactId: null, debug: `${companyMatches.length} company matches for "${agentName}"` };
+    }
 
     const contactIds = (companyMatches[0].properties?.Contacts?.relation || []).map((r) => r.id);
-    if (contactIds.length === 0) return null;
-    if (contactIds.length === 1) return contactIds[0];
+    if (contactIds.length === 0) return { contactId: null, debug: "company matched, no linked contacts" };
+    if (contactIds.length === 1) return { contactId: contactIds[0], debug: "single linked contact" };
 
     const primaryRes = await notion.dataSources.query({
       data_source_id: TRADE_CRM_DATA_SOURCE_ID,
@@ -96,10 +102,12 @@ async function findTradeContact(notion, agentName) {
       },
       page_size: 2,
     });
-    return primaryRes.results.length === 1 ? primaryRes.results[0].id : null;
+    return primaryRes.results.length === 1
+      ? { contactId: primaryRes.results[0].id, debug: "primary contact among multiple" }
+      : { contactId: null, debug: `${contactIds.length} contacts, ${primaryRes.results.length} marked primary` };
   } catch (e) {
     console.error("[itineraries] Notion company/contact lookup failed:", e);
-    return null;
+    return { contactId: null, debug: `error: ${e.message}` };
   }
 }
 
@@ -143,7 +151,7 @@ async function syncFollowUpTask(itinerary, { category, taskLabel }) {
   const notion = notionClient();
   if (!notion) return { ok: false, error: "NOTION_API_KEY not set" };
   try {
-    const contactPageId = await findTradeContact(notion, itinerary.agentName);
+    const { contactId: contactPageId, debug: contactDebug } = await findTradeContact(notion, itinerary.agentName);
     const note = [
       itinerary.agentRef ? `Agent ref: ${itinerary.agentRef}` : null,
       itinerary.ceRef ? `CE ref: ${itinerary.ceRef}` : null,
@@ -156,7 +164,7 @@ async function syncFollowUpTask(itinerary, { category, taskLabel }) {
       note,
       dueDate: addBusinessDays(new Date(), 5),
     });
-    return { ...result, contactLinked: !!contactPageId };
+    return { ...result, contactLinked: !!contactPageId, contactDebug };
   } catch (e) {
     console.error("[itineraries] Notion sync failed:", e);
     return { ok: false, error: e.message };
