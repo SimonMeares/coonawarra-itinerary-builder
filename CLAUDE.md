@@ -105,18 +105,15 @@ To add a new image:
 
 ## Gmail OAuth Integration
 
-The app uses Gmail OAuth to create draft emails with the itinerary as an attachment.
-The OAuth credentials are managed via Netlify environment variables — never hardcode them in the repo.
+Corrected 15 Jul 2026 — this section previously described a server-side flow that was never actually implemented; the real one is entirely client-side.
 
-**Netlify environment variables required:**
-- `GMAIL_CLIENT_ID`
-- `GMAIL_CLIENT_SECRET`
-- `GMAIL_REFRESH_TOKEN`
+The app uses Google Identity Services to create Gmail drafts, requesting only the narrow `gmail.compose` scope (draft-creation, not read/send). Each person clicking "Connect Gmail" authenticates with their own Google account via a popup — there is no shared or service-level Gmail credential anywhere in this app.
 
-If Gmail drafts stop working, check:
-1. The refresh token has not expired
-2. The Netlify environment variables are correctly set
-3. The serverless function in `netlify/functions/` is deployed correctly
+- `GMAIL_CLIENT_ID` is a plain constant hardcoded in `src/App.jsx` — not an env var, and not a secret (OAuth client IDs are meant to be public). It's the same OAuth client also used for this app's own Google sign-in login gate (see `DEPLOYS.md`).
+- There is no `GMAIL_CLIENT_SECRET` or `GMAIL_REFRESH_TOKEN` — confirmed 14 Jul 2026 that neither exists as a Netlify environment variable for this site, and no code references them. No serverless function is involved in Gmail draft creation at all.
+- The resulting access token lives only in that person's own browser (`localStorage`), never touches Netlify or a server.
+
+If Gmail drafts stop working for someone, it's almost always something in their own browser session (popup blocked, token expired, wrong Google account) — there's no server-side credential to check or rotate for this specific feature.
 
 ---
 
