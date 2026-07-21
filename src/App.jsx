@@ -2280,6 +2280,15 @@ function BuilderApp(){
   const[libSearch,setLibSrch]=useState("");
   const[showForm,setShowForm]=useState(false);
   const[editProduct,setEditProduct]=useState(null);
+  // ProductForm always renders at the top of this list - without scrolling
+  // there, editing an item further down looks like the Edit button does
+  // nothing, since the form opens off-screen above the current scroll
+  // position.
+  const libListRef=useRef();
+  const openProductForm=(product)=>{
+    setEditProduct(product);setShowForm(true);setLibCat("Custom");
+    libListRef.current?.scrollTo({top:0,behavior:"smooth"});
+  };
   const[showTemplateManager,setShowTM]=useState(false);
   const[showSaveTemplate,setShowST]=useState(false);
   const[fxRates,setFxRates]=useState(()=>loadFX());
@@ -2855,7 +2864,7 @@ function BuilderApp(){
                   <div style={{fontFamily:F.heading,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>Product Library</div>
                   <div style={{display:"flex",gap:4}}>
                     <BulkImageUploader allProducts={allProducts} productImages={productImages} onImagesChange={handleImagesChange}/>
-                    <button onClick={()=>{setShowForm(true);setEditProduct(null);setLibCat("Custom");}} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
+                    <button onClick={()=>openProductForm(null)} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
                   </div>
                 </div>
                 <input value={libSearch} onChange={e=>setLibSrch(e.target.value)} placeholder="Search products..." style={{width:"100%",fontFamily:F.body,fontSize:12,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 9px",outline:"none",background:C.white,marginBottom:7}}/>
@@ -2867,7 +2876,7 @@ function BuilderApp(){
                   ))}
                 </div>
               </div>
-              <div style={{flex:1,overflowY:"auto",padding:8}}>
+              <div ref={libListRef} style={{flex:1,overflowY:"auto",padding:8}}>
                 {showForm&&<ProductForm initial={editProduct} onSave={handleSaveProduct} onCancel={()=>{setShowForm(false);setEditProduct(null);}}/>}
                 {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
                 {filtered.map(p=>(
@@ -2877,7 +2886,7 @@ function BuilderApp(){
                       if(active.days.length===1){addItem(active.days[0].id,product);}
                       else{setDayPicker({product});}
                     }}
-                    onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
+                    onEdit={()=>openProductForm(p)}
                     onDuplicate={()=>handleDuplicateProduct(p)}
                     onDelete={()=>handleDeleteProduct(p.id)}
                   />
