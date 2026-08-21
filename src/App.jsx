@@ -1,6 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import Login from "./Login.jsx";
-import { getSession, setSession, clearSession, isSessionValid, authHeader } from "./auth";
 
 const C = {
   navy:"#192957",sand:"#d8c69d",sandLight:"#f0ead8",sandDark:"#b8a678",
@@ -530,21 +528,26 @@ async function getGmailToken() {
   return await requestGmailToken();
 }
 
+// ─── Remote persistence (Netlify Blobs via serverless functions) ──────────────
+const DATA_URL="/.netlify/functions/data";
+async function fetchRemote(key){try{const r=await fetch(`${DATA_URL}?key=${key}`);if(!r.ok)return null;const d=await r.json();return d??null;}catch(e){return null;}}
+async function saveRemote(key,data){try{await fetch(`${DATA_URL}?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});}catch(e){console.warn(`[data] remote save failed (${key}):`,e);}}
+
 function loadCP(){try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
-function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}}
+function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}saveRemote("custom-products",p);}
 function loadPC(){try{const r=localStorage.getItem("ce_product_costs_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
 function savePC(v){try{localStorage.setItem("ce_product_costs_v1",JSON.stringify(v));}catch(e){}}
 const IMGS_KEY="ce_product_images_v2";
 function loadImgsLocal(){try{const r=localStorage.getItem(IMGS_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveImgsLocal(i){try{localStorage.setItem(IMGS_KEY,JSON.stringify(i));}catch(e){}}
-async function fetchImgsRemote(){try{const r=await fetch("/.netlify/functions/images",{headers:{...authHeader()}});if(r.status===401){window.dispatchEvent(new Event("ce-itin-unauthorized"));return null;}if(!r.ok)return null;return await r.json();}catch(e){return null;}}
-async function saveImgsRemote(i){try{const r=await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json",...authHeader()},body:JSON.stringify(i)});if(r.status===401)window.dispatchEvent(new Event("ce-itin-unauthorized"));}catch(e){console.warn("[images] remote save failed:",e);}}
+async function fetchImgsRemote(){try{const r=await fetch("/.netlify/functions/images");if(!r.ok)return null;return await r.json();}catch(e){return null;}}
+async function saveImgsRemote(i){try{await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(i)});}catch(e){console.warn("[images] remote save failed:",e);}}
 function loadLogos(){try{const r=localStorage.getItem("ce_partner_logos_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
-function saveLogos(l){try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(l));}catch(e){}}
+function saveLogos(l){try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(l));}catch(e){}saveRemote("partner-logos",l);}
 function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
-function saveIts(l){try{localStorage.setItem("ce_itineraries_v10",JSON.stringify(l));}catch(e){}}
+function saveIts(l){try{localStorage.setItem("ce_itineraries_v10",JSON.stringify(l));}catch(e){}saveRemote("itineraries",l);}
 function loadTemplates(){try{const r=localStorage.getItem("ce_templates_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
-function saveTemplates(t){try{localStorage.setItem("ce_templates_v1",JSON.stringify(t));}catch(e){}}
+function saveTemplates(t){try{localStorage.setItem("ce_templates_v1",JSON.stringify(t));}catch(e){}saveRemote("templates",t);}
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const CSS=`
@@ -1838,24 +1841,7 @@ h2.section-title{font-family:Arial Black,sans-serif;font-size:18px;color:#192957
 .footer-contacts b{color:#d8c69d;}
 @media(max-width:600px){.cover-meta,.footer-contacts{flex-direction:column;gap:8px;}.inc-list{columns:1;}}
 @media print{body{max-width:none;padding:0;}.page-break{page-break-before:always;}@page{margin:12mm;}}
-</style></head><body>${body}
-<script>
-// Fires once on page load to record the first view for CRM follow-up.
-// The endpoint itself is idempotent server-side, so repeat opens are a no-op.
-// Uses text/plain (a CORS-safelisted content type) instead of application/json
-// so the cross-origin ping is a simple request and never needs a preflight —
-// itineraries.js parses the body as JSON regardless of the declared type.
-(function(){
-  var url = "${BUILDER_ORIGIN}/.netlify/functions/itineraries";
-  var payload = JSON.stringify({id: "${itinerary.id}", action: "view"});
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon(url, new Blob([payload], {type: "text/plain"}));
-  } else {
-    fetch(url, {method: "POST", headers: {"Content-Type": "text/plain"}, body: payload}).catch(function(){});
-  }
-})();
-</script>
-</body></html>`;
+</style></head><body>${body}</body></html>`;
 }
 
 // ─── Export CSV ───────────────────────────────────────────────────────────────
@@ -1900,48 +1886,10 @@ function exportToCSV(itineraries, allProducts) {
 // Token is stored server-side as NETLIFY_DEPLOY_TOKEN environment variable.
 // The browser calls /.netlify/functions/deploy which proxies to the Netlify API.
 const NETLIFY_LIVE_URL = "https://ce-limestonecoast.netlify.app";
-// Absolute origin for the generated static HTML's view-tracking ping, since that
-// page is hosted on ce-limestonecoast.netlify.app, a different origin from here.
-const BUILDER_ORIGIN = "https://coonawarra-itinerary-builder.netlify.app";
 
 async function sha1(str) {
   const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-
-// The subset of an itinerary that the CRM needs, synced to Netlify Blobs on every
-// share-link deploy so it's queryable from outside the browser (Phase 3 dashboard).
-function crmMetadata(itinerary, liveUrl) {
-  return {
-    id: itinerary.id,
-    ceRef: itinerary.ceRef,
-    rezdyRef: itinerary.rezdyRef,
-    title: itinerary.title,
-    agentName: itinerary.agentName,
-    agentRef: itinerary.agentRef,
-    clientName: itinerary.clientName,
-    clientEmail: itinerary.clientEmail,
-    status: itinerary.status,
-    statusHistory: itinerary.statusHistory || [],
-    createdAt: itinerary.createdAt,
-    updatedAt: itinerary.updatedAt,
-    liveUrl,
-    crmSync: itinerary.crmSync,
-  };
-}
-
-async function saveItineraryMetadata(itinerary, liveUrl) {
-  try {
-    const res = await fetch("/.netlify/functions/itineraries", {
-      method: "POST",
-      headers: {"Content-Type": "application/json", ...authHeader()},
-      body: JSON.stringify(crmMetadata(itinerary, liveUrl)),
-    });
-    if (res.status === 401) window.dispatchEvent(new Event("ce-itin-unauthorized"));
-  } catch (e) {
-    // Non-fatal — the share link itself already deployed successfully.
-    console.error("[itineraries] metadata sync failed:", e);
-  }
 }
 
 async function deployToNetlify(itinerary, allProducts, productImages, activeCurrency, fxRates) {
@@ -1951,11 +1899,9 @@ async function deployToNetlify(itinerary, allProducts, productImages, activeCurr
   // Call our serverless function — token never touches the browser
   const res = await fetch("/.netlify/functions/deploy", {
     method: "POST",
-    headers: {"Content-Type": "application/json", ...authHeader()},
-    body: JSON.stringify({html, fileHash, itineraryId: itinerary.id}),
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({html, fileHash}),
   });
-
-  if (res.status === 401) window.dispatchEvent(new Event("ce-itin-unauthorized"));
 
   if (!res.ok) {
     const err = await res.json().catch(()=>({}));
@@ -1964,13 +1910,7 @@ async function deployToNetlify(itinerary, allProducts, productImages, activeCurr
 
   const result = await res.json();
   if (result.error) throw new Error(result.error);
-
-  // Share the clean directory URL (Netlify serves index.html for it implicitly)
-  // rather than the literal file path used internally for the deploy manifest.
-  const dirPath = result.path ? result.path.replace(/index\.html$/, "") : "";
-  const liveUrl = dirPath ? `${NETLIFY_LIVE_URL}${dirPath}` : NETLIFY_LIVE_URL;
-  await saveItineraryMetadata(itinerary, liveUrl);
-  return liveUrl;
+  return NETLIFY_LIVE_URL;
 }
 
 // ─── Share button component ────────────────────────────────────────────────────
@@ -1978,22 +1918,6 @@ function ShareButton({itinerary, allProducts, productImages, activeCurrency, fxR
   const [state, setState] = useState("idle"); // idle | deploying | done | error
   const [liveUrl, setLiveUrl] = useState("");
   const [copied, setCopied] = useState(false);
-
-  // Sample/demo itineraries (id starts with "sample_", not the "c_..." ids
-  // uid() gives real ones) are reference content, not meant to be published
-  // as a live shared link - deploy.js's id-format check has always rejected
-  // them anyway, this just fails clearly up front instead of a confusing
-  // "Invalid itineraryId" after clicking Share.
-  if (!/^c_/.test(itinerary.id)) {
-    return (
-      <button disabled title="Sample itineraries can't be shared directly — click + New to create your own itinerary first"
-        style={{fontFamily:F.heading,fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",
-          color:"rgba(255,255,255,0.4)",background:"rgba(255,255,255,0.08)",border:"none",borderRadius:5,padding:"6px 12px",cursor:"not-allowed"}}
-      >
-        🔗 Share link
-      </button>
-    );
-  }
 
   async function handleDeploy() {
     setState("deploying");
@@ -2019,7 +1943,7 @@ function ShareButton({itinerary, allProducts, productImages, activeCurrency, fxR
     <div style={{display:"flex",alignItems:"center",gap:4}}>
       <div style={{display:"flex",flexDirection:"column",gap:1}}>
         <div style={{fontFamily:F.body,fontSize:10,color:C.white,background:"rgba(255,255,255,0.15)",borderRadius:5,padding:"4px 10px",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-          {liveUrl.replace("https://","")}
+          ce-limestonecoast.netlify.app
         </div>
         <div style={{fontFamily:F.body,fontSize:9,color:"rgba(255,255,255,0.45)",paddingLeft:2}}>
           Live: {itinerary.ceRef||"—"}{itinerary.clientName?` · ${itinerary.clientName}`:""}
@@ -2260,7 +2184,7 @@ const EDIT_TABS=[
 ];
 
 // ─── App ──────────────────────────────────────────────────────────────────────
-function BuilderApp(){
+export default function App(){
   const[tab,setTab]=useState("builder");
   const[bView,setBView]=useState("edit");
   const[editTab,setEditTab]=useState("itinerary");
@@ -2280,15 +2204,6 @@ function BuilderApp(){
   const[libSearch,setLibSrch]=useState("");
   const[showForm,setShowForm]=useState(false);
   const[editProduct,setEditProduct]=useState(null);
-  // ProductForm always renders at the top of this list - without scrolling
-  // there, editing an item further down looks like the Edit button does
-  // nothing, since the form opens off-screen above the current scroll
-  // position.
-  const libListRef=useRef();
-  const openProductForm=(product)=>{
-    setEditProduct(product);setShowForm(true);setLibCat("Custom");
-    libListRef.current?.scrollTo({top:0,behavior:"smooth"});
-  };
   const[showTemplateManager,setShowTM]=useState(false);
   const[showSaveTemplate,setShowST]=useState(false);
   const[fxRates,setFxRates]=useState(()=>loadFX());
@@ -2307,12 +2222,59 @@ function BuilderApp(){
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
 
-  // Sync image URLs from Netlify Blobs on mount (Blobs is source of truth; localStorage is fast initial load)
+  // Sync all data from Netlify Blobs on mount — Blobs is source of truth
   useEffect(()=>{
+    // Itineraries
+    fetchRemote("itineraries").then(remote=>{
+      if(remote&&Array.isArray(remote)&&remote.length>0){
+        const samples=buildSamples();
+        const toAdd=samples.filter(s=>!remote.some(it=>it.id===s.id));
+        const merged=toAdd.length>0?[...toAdd,...remote]:remote;
+        setIts(merged);
+        try{localStorage.setItem("ce_itineraries_v10",JSON.stringify(merged));}catch(e){}
+      } else {
+        const local=loadIts();
+        if(local.length>0)saveRemote("itineraries",local);
+      }
+    });
+    // Custom products
+    fetchRemote("custom-products").then(remote=>{
+      if(remote&&Array.isArray(remote)&&remote.length>0){
+        setCPs(remote);
+        try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(remote));}catch(e){}
+      } else {
+        const local=loadCP();
+        if(local.length>0)saveRemote("custom-products",local);
+      }
+    });
+    // Templates
+    fetchRemote("templates").then(remote=>{
+      if(remote&&Array.isArray(remote)&&remote.length>0){
+        setTemplates(remote);
+        try{localStorage.setItem("ce_templates_v1",JSON.stringify(remote));}catch(e){}
+      } else {
+        const local=loadTemplates();
+        if(local.length>0)saveRemote("templates",local);
+      }
+    });
+    // Partner logos
+    fetchRemote("partner-logos").then(remote=>{
+      if(remote&&typeof remote==="object"&&Object.keys(remote).length>0){
+        setPLogos(remote);
+        try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(remote));}catch(e){}
+      } else {
+        const local=loadLogos();
+        if(Object.keys(local).length>0)saveRemote("partner-logos",local);
+      }
+    });
+    // Images
+    const localImgs=loadImgsLocal();
     fetchImgsRemote().then(remote=>{
       if(remote&&typeof remote==="object"&&Object.keys(remote).length>0){
         setPImgs(remote);
         saveImgsLocal(remote);
+      } else if(Object.keys(localImgs).length>0){
+        saveImgsRemote(localImgs);
       }
     });
   },[]);
@@ -2864,7 +2826,7 @@ function BuilderApp(){
                   <div style={{fontFamily:F.heading,fontSize:10,fontWeight:700,color:C.grey400,letterSpacing:"0.1em",textTransform:"uppercase"}}>Product Library</div>
                   <div style={{display:"flex",gap:4}}>
                     <BulkImageUploader allProducts={allProducts} productImages={productImages} onImagesChange={handleImagesChange}/>
-                    <button onClick={()=>openProductForm(null)} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
+                    <button onClick={()=>{setShowForm(true);setEditProduct(null);setLibCat("Custom");}} style={{fontFamily:F.body,fontSize:10,fontWeight:700,color:C.white,background:C.teal,border:"none",borderRadius:5,padding:"3px 10px"}}>+ Custom</button>
                   </div>
                 </div>
                 <input value={libSearch} onChange={e=>setLibSrch(e.target.value)} placeholder="Search products..." style={{width:"100%",fontFamily:F.body,fontSize:12,border:`1px solid ${C.grey200}`,borderRadius:5,padding:"5px 9px",outline:"none",background:C.white,marginBottom:7}}/>
@@ -2876,7 +2838,7 @@ function BuilderApp(){
                   ))}
                 </div>
               </div>
-              <div ref={libListRef} style={{flex:1,overflowY:"auto",padding:8}}>
+              <div style={{flex:1,overflowY:"auto",padding:8}}>
                 {showForm&&<ProductForm initial={editProduct} onSave={handleSaveProduct} onCancel={()=>{setShowForm(false);setEditProduct(null);}}/>}
                 {filtered.length===0&&!showForm&&<div style={{textAlign:"center",padding:24,color:C.grey400,fontFamily:F.body,fontSize:12}}>{libCat==="Custom"?"No custom products yet. Click + Custom to add one.":"No products match"}</div>}
                 {filtered.map(p=>(
@@ -2886,7 +2848,7 @@ function BuilderApp(){
                       if(active.days.length===1){addItem(active.days[0].id,product);}
                       else{setDayPicker({product});}
                     }}
-                    onEdit={()=>openProductForm(p)}
+                    onEdit={()=>{setEditProduct(p);setShowForm(true);setLibCat("Custom");}}
                     onDuplicate={()=>handleDuplicateProduct(p)}
                     onDelete={()=>handleDeleteProduct(p.id)}
                   />
@@ -2916,14 +2878,9 @@ function BuilderApp(){
                   <input value={active.origin} onChange={e=>mutate(it=>({...it,origin:e.target.value}))} placeholder="Origin" style={{...fi,width:110}}/>
                   <select value={active.status} onChange={e=>{
                     const newStatus=e.target.value;
-                    const updated={...active,status:newStatus,
-                      statusHistory:[...(active.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
-                    };
-                    mutate(()=>updated);
-                    // Status changes are local-only otherwise — sync so the server can detect
-                    // the transition (e.g. for the Notion Follow-Up Task hook). liveUrl omitted:
-                    // the server merges this with whatever's already stored for this itinerary.
-                    saveItineraryMetadata(updated, undefined);
+                    mutate(it=>({...it,status:newStatus,
+                      statusHistory:[...(it.statusHistory||[]),{status:newStatus,date:new Date().toISOString()}]
+                    }));
                   }} style={{...fi,color:SC[active.status],fontWeight:600}}>
                     <option value="draft">Draft</option><option value="review">In Review</option><option value="published">Published</option>
                   </select>
@@ -3065,17 +3022,6 @@ function BuilderApp(){
                             <AgentLogoUploader onUpload={url=>mutate(it=>({...it,agentLogo:url}))}/>
                           )}
                         </div>
-                        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.grey200}`,display:"flex",alignItems:"flex-start",gap:8}}>
-                          <input type="checkbox" checked={active.crmSync!==false} onChange={e=>{
-                            const updated={...active,crmSync:e.target.checked};
-                            mutate(()=>updated);
-                            saveItineraryMetadata(updated, undefined);
-                          }} style={{marginTop:2}}/>
-                          <div>
-                            <label style={{fontFamily:F.body,fontSize:11,fontWeight:700,color:C.text,display:"block"}}>Sync to CRM (Notion Follow-Up Tasks)</label>
-                            <div style={{fontFamily:F.body,fontSize:10,color:C.grey400,marginTop:2}}>Untick to keep this itinerary silent in Notion, even with an agent name set — no task is created when it's viewed or its status changes.</div>
-                          </div>
-                        </div>
                       </SectionBox>
                     )}
                     <SectionBox title="Cover Hero Image (optional)">
@@ -3137,40 +3083,5 @@ function BuilderApp(){
       )}
 
     </div>
-  );
-}
-
-// ─── Auth gate ──────────────────────────────────────────────────────────────
-// Restricted to a single whitelisted Google account - see
-// netlify/functions/_lib/auth.js and auth-login.js. Wraps BuilderApp rather
-// than touching its internals: unauthenticated visitors get Login instead,
-// signed-in visitors get the full app plus a small sign-out control.
-// A gated fetch call (images.js, itineraries.js full-record save, deploy.js)
-// dispatches "ce-itin-unauthorized" on a 401 so this drops back to Login
-// without waiting for a page reload - same pattern as the CRM dashboard.
-export default function App(){
-  const[session,setSessionState]=useState(()=>isSessionValid()?getSession():null);
-
-  useEffect(()=>{
-    function handleUnauthorized(){clearSession();setSessionState(null);}
-    window.addEventListener("ce-itin-unauthorized",handleUnauthorized);
-    return()=>window.removeEventListener("ce-itin-unauthorized",handleUnauthorized);
-  },[]);
-
-  if(!session){
-    return <Login onSignedIn={()=>setSessionState(getSession())}/>;
-  }
-
-  return(
-    <>
-      <BuilderApp/>
-      <button
-        onClick={()=>{clearSession();setSessionState(null);}}
-        title="Sign out"
-        style={{position:"fixed",bottom:10,right:10,zIndex:9999,fontFamily:"'Source Sans 3','Source Sans Pro','Open Sans',sans-serif",fontSize:11,color:"#5c5a54",background:"#f0ead8",border:"1px solid #e8e6e0",borderRadius:6,padding:"5px 10px",cursor:"pointer",opacity:0.85}}
-      >
-        Sign out
-      </button>
-    </>
   );
 }
