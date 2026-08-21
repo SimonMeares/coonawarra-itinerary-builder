@@ -531,7 +531,27 @@ async function getGmailToken() {
 // ─── Remote persistence (Netlify Blobs via serverless functions) ──────────────
 const DATA_URL="/.netlify/functions/data";
 async function fetchRemote(key){try{const r=await fetch(`${DATA_URL}?key=${key}`);if(!r.ok)return null;const d=await r.json();return d??null;}catch(e){return null;}}
-async function saveRemote(key,data){try{await fetch(`${DATA_URL}?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});}catch(e){console.warn(`[data] remote save failed (${key}):`,e);}}
+
+// Sync status — wired to React state from inside App component
+let _setSyncStatus=null;
+let _syncFadeTimer=null;
+function _notifySyncStatus(s){
+  if(_setSyncStatus)_setSyncStatus(s);
+  clearTimeout(_syncFadeTimer);
+  if(s==="saved"){_syncFadeTimer=setTimeout(()=>{if(_setSyncStatus)_setSyncStatus("idle");},3000);}
+  if(s==="failed"){_syncFadeTimer=setTimeout(()=>{if(_setSyncStatus)_setSyncStatus("idle");},8000);}
+}
+
+async function saveRemote(key,data){
+  _notifySyncStatus("saving");
+  try{
+    const r=await fetch(`${DATA_URL}?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+    if(r.ok)_notifySyncStatus("saved"); else _notifySyncStatus("failed");
+  }catch(e){
+    _notifySyncStatus("failed");
+    console.warn(`[data] remote save failed (${key}):`,e);
+  }
+}
 
 function loadCP(){try{const r=localStorage.getItem("ce_custom_products_v1");return r?JSON.parse(r):[];}catch(e){return[];}}
 function saveCP(p){try{localStorage.setItem("ce_custom_products_v1",JSON.stringify(p));}catch(e){}saveRemote("custom-products",p);}
@@ -541,7 +561,16 @@ const IMGS_KEY="ce_product_images_v2";
 function loadImgsLocal(){try{const r=localStorage.getItem(IMGS_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveImgsLocal(i){try{localStorage.setItem(IMGS_KEY,JSON.stringify(i));}catch(e){}}
 async function fetchImgsRemote(){try{const r=await fetch("/.netlify/functions/images");if(!r.ok)return null;return await r.json();}catch(e){return null;}}
-async function saveImgsRemote(i){try{await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(i)});}catch(e){console.warn("[images] remote save failed:",e);}}
+async function saveImgsRemote(i){
+  _notifySyncStatus("saving");
+  try{
+    const r=await fetch("/.netlify/functions/images",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(i)});
+    if(r.ok)_notifySyncStatus("saved"); else _notifySyncStatus("failed");
+  }catch(e){
+    _notifySyncStatus("failed");
+    console.warn("[images] remote save failed:",e);
+  }
+}
 function loadLogos(){try{const r=localStorage.getItem("ce_partner_logos_v1");return r?JSON.parse(r):{};}catch(e){return{};}}
 function saveLogos(l){try{localStorage.setItem("ce_partner_logos_v1",JSON.stringify(l));}catch(e){}saveRemote("partner-logos",l);}
 function loadIts(){try{const r=localStorage.getItem("ce_itineraries_v10");return r?JSON.parse(r):[];}catch(e){return[];}}
@@ -558,6 +587,7 @@ input,textarea,select,button{font-family:inherit;}
 ::-webkit-scrollbar{width:5px;}
 ::-webkit-scrollbar-track{background:#f4f3f0;}
 ::-webkit-scrollbar-thumb{background:#d8c69d;border-radius:3px;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .img-drop-zone{border:2px dashed #e8e6e0;border-radius:6px;padding:10px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;}
 .img-drop-zone:hover,.img-drop-zone.drag-over{border-color:#40c0c0;background:#e0f7f733;}
 .img-thumb{position:relative;display:inline-block;}
@@ -2219,6 +2249,9 @@ export default function App(){
   const[pdfCompressing,setPdfCompressing]=useState(false);
   const[pdfCompressProgress,setPdfCompressProgress]=useState("");
   const[pdfCompressDone,setPdfCompressDone]=useState(false);
+  const[syncStatus,setSyncStatus]=useState("idle");
+  // Wire the module-level sync notifier to this component's setState
+  useEffect(()=>{_setSyncStatus=setSyncStatus;return()=>{_setSyncStatus=null;};},[]);
 
   const allProducts=[...BUILT_IN_PRODUCTS,...customProducts];
 
@@ -2277,6 +2310,21 @@ export default function App(){
         saveImgsRemote(localImgs);
       }
     });
+  },[]);
+
+  // Background sync — every 5 minutes, push all data to Blobs regardless of user action
+  const bgRef=useRef({});
+  useEffect(()=>{bgRef.current={itineraries,customProducts,templates,partnerLogos,productImages};},[itineraries,customProducts,templates,partnerLogos,productImages]);
+  useEffect(()=>{
+    const t=setInterval(()=>{
+      const d=bgRef.current;
+      if(d.itineraries?.length)saveRemote("itineraries",d.itineraries);
+      if(d.customProducts?.length)saveRemote("custom-products",d.customProducts);
+      if(d.templates?.length)saveRemote("templates",d.templates);
+      if(d.partnerLogos&&Object.keys(d.partnerLogos).length)saveRemote("partner-logos",d.partnerLogos);
+      if(d.productImages&&Object.keys(d.productImages).length)saveImgsRemote(d.productImages);
+    },5*60*1000);
+    return()=>clearInterval(t);
   },[]);
 
   // Keyboard shortcuts
@@ -2646,6 +2694,14 @@ export default function App(){
             </div>
           )}
           <div style={{flex:1}}/>
+          {/* Sync status indicator */}
+          {syncStatus!=="idle"&&(
+            <div style={{fontFamily:F.body,fontSize:10,display:"flex",alignItems:"center",gap:4,
+              color:syncStatus==="saving"?"rgba(255,255,255,0.45)":syncStatus==="saved"?C.teal:"#e88"}}>
+              {syncStatus==="saving"&&<span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span>}
+              {syncStatus==="saving"?"Saving...":syncStatus==="saved"?"✓ Saved to cloud":"⚠ Save failed — check connection"}
+            </div>
+          )}
           {/* Templates */}
           <button onClick={()=>setShowTM(true)} style={{fontFamily:F.body,fontSize:11,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.08)",border:`1px solid rgba(255,255,255,0.15)`,borderRadius:5,padding:"5px 11px"}}>📋 Templates</button>
           {tab==="builder"&&active&&bView==="edit"&&(
