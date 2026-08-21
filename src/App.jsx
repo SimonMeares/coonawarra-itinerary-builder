@@ -2219,7 +2219,7 @@ export default function App(){
   const[bView,setBView]=useState("edit");
   const[editTab,setEditTab]=useState("itinerary");
   const[showInternal,setSI]=useState(false);
-  const[itineraries,setIts]=useState(()=>{const stored=loadIts();const toAdd=buildSamples().filter(s=>!stored.some(it=>it.id===s.id));if(toAdd.length===0)return stored;const merged=[...toAdd,...stored];saveIts(merged);return merged;});
+  const[itineraries,setIts]=useState(()=>{const stored=loadIts();const toAdd=buildSamples().filter(s=>!stored.some(it=>it.id===s.id));if(toAdd.length===0)return stored;const merged=[...toAdd,...stored];try{localStorage.setItem("ce_itineraries_v10",JSON.stringify(merged));}catch(e){}return merged;});
   const[activeId,setActiveId]=useState(null);
   const[productImages,setPImgs]=useState(()=>loadImgsLocal());
   const[partnerLogos,setPLogos]=useState(()=>loadLogos());
